@@ -9,6 +9,63 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      goals: {
+        Row: {
+          id: string;
+          name: string;
+          category: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          category: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          category?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      member_goals: {
+        Row: {
+          id: string;
+          member_id: string;
+          goal_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          goal_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          goal_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_goals_goal_id_fkey";
+            columns: ["goal_id"];
+            isOneToOne: false;
+            referencedRelation: "goals";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_goals_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       members: {
         Row: {
           age: number | null;

@@ -1,5 +1,6 @@
 import TopBar from "@/components/layout/TopBar";
 import HeroSection from "@/components/sections/HeroSection";
+import GoalsSection from "@/components/goals/GoalsSection";
 
 const HomePage = () => {
   return (
@@ -14,11 +15,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      <section id="goals" className="min-h-[50vh] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="font-heading text-foreground text-3xl">Goals</h2>
-        </div>
-      </section>
+      <GoalsSection />
 
       <section id="profile" className="min-h-[50vh] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">

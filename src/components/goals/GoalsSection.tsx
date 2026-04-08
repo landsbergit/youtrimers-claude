@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useGoals } from "@/hooks/useGoals";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ import { SelectedGoalsBar } from "./SelectedGoalsBar";
 
 /**
  * Returns 2 on mobile/tablet (< 1024px) and 3 on desktop.
- * This controls how many goals are visible before the "More..." button.
+ * Controls how many goals are visible before the "More..." button.
  */
 function useCollapsedGoalCount(): number {
   const [count, setCount] = useState(3);
@@ -28,19 +28,31 @@ function useCollapsedGoalCount(): number {
 /**
  * Goals section — lets the user browse goals by category and select up to 3.
  *
- * Goals are loaded from Supabase. Categories are hard-coded in GOAL_CATEGORIES.
+ * Categories are hard-coded in GOAL_CATEGORIES.
+ * Goals within each category are direct children of the category node in the ontology table.
  * Saving to member_goals is a TODO pending member selection UI.
  */
 export default function GoalsSection() {
-  const { goals, loading } = useGoals();
+  const { goalNodes, loading } = useGoals();
   const { user } = useAuth();
   const collapsedCount = useCollapsedGoalCount();
 
   const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
-  const goalsByCategory = (category: string) =>
-    goals.filter((g) => g.category === category);
+  // Build a lookup: node_name → id, so we can find category node IDs
+  const nodeIdByName = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const node of goalNodes) map.set(node.node_name, node.id);
+    return map;
+  }, [goalNodes]);
+
+  // Returns direct children (selectable goals) for a given category node_name
+  const goalsForCategory = (categoryNodeName: string): Goal[] => {
+    const categoryId = nodeIdByName.get(categoryNodeName);
+    if (!categoryId) return [];
+    return goalNodes.filter((g) => g.parent_id === categoryId);
+  };
 
   const isSelected = (goalId: string) =>
     selectedGoals.some((g) => g.id === goalId);
@@ -58,12 +70,14 @@ export default function GoalsSection() {
   };
 
   const handleDone = () => {
-    // TODO: save selectedGoals to member_goals table once member selection is implemented
     if (!user) {
-      toast.info("Your goals are saved for this session only. To save them for future use, please sign in or register.");
-    } else {
-      toast.success("Goals saved!");
+      toast.info(
+        "Your goals are saved for this session only. To save them for future use, please sign in or register."
+      );
+      return;
     }
+    // TODO: save selectedGoals to member_goals table once member selection is implemented
+    toast.success("Goals saved!");
   };
 
   if (loading) {
@@ -95,16 +109,18 @@ export default function GoalsSection() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {GOAL_CATEGORIES.map((cat) => (
             <CategoryCard
-              key={cat.name}
-              name={cat.name}
+              key={cat.node_name}
+              name={cat.label}
               icon={cat.icon}
-              goals={goalsByCategory(cat.name)}
-              isExpanded={expandedCategory === cat.name}
+              goals={goalsForCategory(cat.node_name)}
+              isExpanded={expandedCategory === cat.node_name}
               collapsedCount={collapsedCount}
               isSelected={isSelected}
               onToggleGoal={toggleGoal}
               onExpandToggle={() =>
-                setExpandedCategory(expandedCategory === cat.name ? null : cat.name)
+                setExpandedCategory(
+                  expandedCategory === cat.node_name ? null : cat.node_name
+                )
               }
               onClickOutside={() => setExpandedCategory(null)}
             />
@@ -112,7 +128,8 @@ export default function GoalsSection() {
         </div>
 
         <p className="text-muted-foreground text-sm mt-6">
-          We recommend focusing on 1 or 2 goals at a time. You can choose up to {MAX_SELECTED_GOALS} goals.
+          We recommend focusing on 1 or 2 goals at a time. You can choose up to{" "}
+          {MAX_SELECTED_GOALS} goals.
         </p>
       </div>
     </section>

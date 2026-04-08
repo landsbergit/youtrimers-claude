@@ -35,7 +35,7 @@ export function GoalPillRow({ goals, isSelected, onToggle, showMore, onMore }: G
                   ✓
                 </span>
               )}
-              {goal.name}
+              {goal.display_name}
             </button>
 
             {needsDividerAfter && (

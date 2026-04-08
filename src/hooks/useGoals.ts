@@ -3,27 +3,34 @@ import { supabase } from "@/lib/supabase";
 import type { Goal } from "@/types/goals";
 
 interface UseGoalsResult {
-  goals: Goal[];
+  /** All active nodes in the ontology with type = 'goals' */
+  goalNodes: Goal[];
   loading: boolean;
   error: string | null;
 }
 
+/**
+ * Fetches all active goal nodes from the ontology table.
+ * The caller filters by parent_id to get goals per category.
+ */
 export function useGoals(): UseGoalsResult {
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [goalNodes, setGoalNodes] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchGoals = async () => {
       const { data, error } = await supabase
-        .from("goals")
-        .select("id, name, category")
-        .order("name");
+        .from("ontology")
+        .select("id, node_name, display_name, parent_id")
+        .eq("type", "goals")
+        .eq("is_active", true)
+        .order("sort_order");
 
       if (error) {
         setError(error.message);
       } else if (data) {
-        setGoals(data);
+        setGoalNodes(data);
       }
       setLoading(false);
     };
@@ -31,5 +38,5 @@ export function useGoals(): UseGoalsResult {
     fetchGoals();
   }, []);
 
-  return { goals, loading, error };
+  return { goalNodes, loading, error };
 }

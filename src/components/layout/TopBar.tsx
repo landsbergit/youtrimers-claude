@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Menu, X, ShoppingCart, UserCircle } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -6,18 +6,59 @@ import AuthDialog from "@/components/auth/AuthDialog";
 
 const NAV_ITEMS = [
   { label: "Supplements", mobileLabel: "Current Supplements", href: "#supplements", tooltip: "Assess your current supplements" },
-  { label: "Goals", href: "#goals", tooltip: "Choose your health, sports, and beauty goals" },
-  { label: "Profile", href: "#profile", tooltip: "Fill out your profile to unlock better matches" },
-  { label: "Approach", href: "#approach", tooltip: "Take control of how you supplement" },
-  { label: "Matches", href: "#matches", tooltip: "Discover off-the-shelf products matching your needs and goals", highlight: true, spaceBefore: true },
-  { label: "Cart", href: "#cart", tooltip: "Your shopping cart", icon: "cart", spaceBefore: true },
-  { label: "Account", href: "#account", tooltip: "Login or Create an Account", icon: "account" },
-  { label: "About", href: "#about", tooltip: "Welcome! Find out more about Youtrimers" },
+  { label: "Goals",        href: "#goals",       tooltip: "Choose your health, sports, and beauty goals" },
+  { label: "Profile",      href: "#profile",     tooltip: "Fill out your profile to unlock better matches" },
+  { label: "Approach",     href: "#approach",    tooltip: "Take control of how you supplement" },
+  { label: "Matches",      href: "#matches",     tooltip: "Discover off-the-shelf products matching your needs and goals", highlight: true, spaceBefore: true },
+  { label: "Cart",         href: "#cart",        tooltip: "Your shopping cart", icon: "cart", spaceBefore: true },
+  { label: "Account",      href: "#account",     tooltip: "Login or Create an Account", icon: "account" },
+  { label: "About",        href: "#about",       tooltip: "Welcome! Find out more about Youtrimers" },
 ];
+
+/** IDs of sections that map 1-to-1 with nav items (excludes #account which opens a dialog) */
+const SECTION_IDS = NAV_ITEMS
+  .filter((item) => item.icon !== "account")
+  .map((item) => item.href.slice(1)); // strip the leading #
+
+/**
+ * Tracks which section id is currently centred in the viewport.
+ * Uses IntersectionObserver with a narrow root margin so only the section
+ * occupying the middle of the screen is considered active.
+ */
+function useActiveSection(): string | null {
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = [];
+
+    SECTION_IDS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActiveSection(id);
+          }
+        },
+        // Trigger when the section crosses the centre band of the viewport
+        { rootMargin: "-45% 0px -45% 0px", threshold: 0 },
+      );
+
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => observers.forEach((o) => o.disconnect());
+  }, []);
+
+  return activeSection;
+}
 
 const TopBar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
+  const activeSection = useActiveSection();
 
   const handleNavClick = (href: string, icon?: string) => {
     setMobileOpen(false);
@@ -51,31 +92,40 @@ const TopBar = () => {
           {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1">
             <TooltipProvider delayDuration={300}>
-              {NAV_ITEMS.map((item) => (
-                <Tooltip key={item.href}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => handleNavClick(item.href, item.icon)}
-                      className={`px-3 py-2 text-sm font-medium transition-colors rounded-md hover:bg-accent min-h-[44px] flex items-center
-                        ${item.highlight ? "text-primary font-semibold hover:text-primary/80" : "text-muted-foreground hover:text-foreground"}
-                        ${item.spaceBefore ? "ml-4" : ""}`}
-                    >
-                      {item.icon === "cart" ? (
-                        <ShoppingCart className="h-5 w-5" />
-                      ) : item.icon === "account" ? (
-                        <UserCircle className="h-5 w-5" />
-                      ) : (
-                        item.label
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  {item.tooltip && (
-                    <TooltipContent>
-                      <p>{item.tooltip}</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              ))}
+              {NAV_ITEMS.map((item) => {
+                const sectionId = item.href.slice(1);
+                const isActive = activeSection === sectionId;
+
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => handleNavClick(item.href, item.icon)}
+                        className={`px-3 py-2 text-sm font-medium transition-colors rounded-md min-h-[44px] flex items-center
+                          ${item.highlight
+                            ? "text-primary font-semibold hover:bg-accent hover:text-primary/80"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"}
+                          ${item.spaceBefore ? "ml-4" : ""}
+                          ${isActive ? "bg-accent text-foreground" : ""}`}
+                      >
+                        {item.icon === "cart" ? (
+                          <ShoppingCart className="h-5 w-5" />
+                        ) : item.icon === "account" ? (
+                          <UserCircle className="h-5 w-5" />
+                        ) : (
+                          item.label
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    {/* Suppress tooltip when the section is already active */}
+                    {item.tooltip && !isActive && (
+                      <TooltipContent>
+                        <p>{item.tooltip}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                );
+              })}
             </TooltipProvider>
           </nav>
 
@@ -92,21 +142,26 @@ const TopBar = () => {
         {/* Mobile Nav Dropdown */}
         {mobileOpen && (
           <nav className="md:hidden border-t border-border bg-background px-4 pb-4">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.href}
-                onClick={() => handleNavClick(item.href, item.icon)}
-                className="block w-full text-left px-3 py-3 text-base font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-md min-h-[44px]"
-              >
-                {item.icon === "cart" ? (
-                  <span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> Cart</span>
-                ) : item.icon === "account" ? (
-                  <span className="flex items-center gap-2"><UserCircle className="h-5 w-5" /> Account</span>
-                ) : (
-                  item.mobileLabel || item.label
-                )}
-              </button>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const isActive = activeSection === item.href.slice(1);
+              return (
+                <button
+                  key={item.href}
+                  onClick={() => handleNavClick(item.href, item.icon)}
+                  className={`block w-full text-left px-3 py-3 text-base font-medium rounded-md min-h-[44px]
+                    hover:text-foreground hover:bg-accent
+                    ${isActive ? "bg-accent text-foreground" : "text-muted-foreground"}`}
+                >
+                  {item.icon === "cart" ? (
+                    <span className="flex items-center gap-2"><ShoppingCart className="h-5 w-5" /> Cart</span>
+                  ) : item.icon === "account" ? (
+                    <span className="flex items-center gap-2"><UserCircle className="h-5 w-5" /> Account</span>
+                  ) : (
+                    item.mobileLabel || item.label
+                  )}
+                </button>
+              );
+            })}
           </nav>
         )}
       </header>

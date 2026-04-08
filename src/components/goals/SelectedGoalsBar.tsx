@@ -24,11 +24,11 @@ export function SelectedGoalsBar({ selectedGoals, onRemoveGoal, onDone }: Select
             key={goal.id}
             className="inline-flex items-center gap-1.5 rounded-full border-2 border-primary bg-card px-4 py-1.5 text-sm font-medium text-primary"
           >
-            {goal.name}
+            {goal.display_name}
             <button
               onClick={() => onRemoveGoal(goal.id)}
               className="ml-1 text-destructive hover:text-destructive/80 transition-colors"
-              aria-label={`Remove ${goal.name}`}
+              aria-label={`Remove ${goal.display_name}`}
             >
               <X size={16} strokeWidth={2.5} />
             </button>

@@ -9,32 +9,11 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      goals: {
-        Row: {
-          id: string;
-          name: string;
-          category: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          category: string;
-          created_at?: string;
-        };
-        Update: {
-          id?: string;
-          name?: string;
-          category?: string;
-          created_at?: string;
-        };
-        Relationships: [];
-      };
       member_goals: {
         Row: {
           id: string;
           member_id: string;
-          goal_id: string;
+          goal_id: string;  // references ontology.id
           created_at: string;
         };
         Insert: {
@@ -54,7 +33,7 @@ export type Database = {
             foreignKeyName: "member_goals_goal_id_fkey";
             columns: ["goal_id"];
             isOneToOne: false;
-            referencedRelation: "goals";
+            referencedRelation: "ontology";
             referencedColumns: ["id"];
           },
           {

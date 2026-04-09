@@ -3,9 +3,6 @@ import { ChevronUp } from "lucide-react";
 import type { Goal } from "@/types/goals";
 import { GoalPillRow } from "./GoalPillRow";
 
-/** How many goals to show per row in the expanded "More" view */
-const EXPANDED_GOALS_PER_ROW = 8;
-
 function chunkArray<T>(arr: T[], chunkSize: number): T[][] {
   const chunks: T[][] = [];
   for (let i = 0; i < arr.length; i += chunkSize) {
@@ -84,9 +81,9 @@ export function CategoryCard({
       </div>
 
       {isExpanded ? (
-        // All goals in rows of EXPANDED_GOALS_PER_ROW
+        // All goals in rows of collapsedCount (same width as the collapsed row — guaranteed to fit)
         <div>
-          {chunkArray(goals, EXPANDED_GOALS_PER_ROW).map((row, rowIdx) => (
+          {chunkArray(goals, collapsedCount).map((row, rowIdx) => (
             <GoalPillRow
               key={rowIdx}
               goals={row}

@@ -41,7 +41,7 @@ export function SelectedGoalsBar({ selectedGoals, onRemoveGoal, onDone }: Select
           onClick={onDone}
           className="ml-auto rounded-lg bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
         >
-          Done
+          Save Goals
         </button>
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useGoals } from "@/hooks/useGoals";
 import { useAuth } from "@/hooks/useAuth";
+import { useRecommendationContext } from "@/context/RecommendationContext";
 import { GOAL_CATEGORIES, MAX_SELECTED_GOALS } from "@/types/goals";
 import type { Goal } from "@/types/goals";
 import { CategoryCard } from "./CategoryCard";
@@ -28,16 +29,22 @@ function useCollapsedGoalCount(): number {
 /**
  * Goals section — lets the user browse goals by category and select up to 3.
  *
- * Categories are hard-coded in GOAL_CATEGORIES.
- * Goals within each category are direct children of the category node in the ontology table.
- * Saving to member_goals is a TODO pending member selection UI.
+ * Selected goals are stored in RecommendationContext so the Matches section
+ * can react to them. "Save Goals" confirms the selection, records the section
+ * as saved, and scrolls to the next unsaved personalization section.
  */
 export default function GoalsSection() {
   const { goalNodes, loading } = useGoals();
   const { user } = useAuth();
   const collapsedCount = useCollapsedGoalCount();
 
-  const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
+  const {
+    selectedGoals,
+    setSelectedGoals,
+    saveSection,
+    scrollToNextSection,
+  } = useRecommendationContext();
+
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   // Build a lookup: node_name → id, so we can find category node IDs
@@ -59,25 +66,33 @@ export default function GoalsSection() {
 
   const toggleGoal = (goal: Goal) => {
     if (isSelected(goal.id)) {
-      setSelectedGoals((prev) => prev.filter((g) => g.id !== goal.id));
+      setSelectedGoals(selectedGoals.filter((g) => g.id !== goal.id));
       return;
     }
     if (selectedGoals.length >= MAX_SELECTED_GOALS) {
       toast.warning(`You can choose up to ${MAX_SELECTED_GOALS} goals at a time.`);
       return;
     }
-    setSelectedGoals((prev) => [...prev, goal]);
+    setSelectedGoals([...selectedGoals, goal]);
   };
 
-  const handleDone = () => {
+  const handleSaveGoals = () => {
+    if (selectedGoals.length === 0) {
+      toast.warning("Please select at least one goal before saving.");
+      return;
+    }
+
     if (!user) {
       toast.info(
         "Your goals are saved for this session only. To save them for future use, please sign in or register."
       );
-      return;
+    } else {
+      // TODO: persist selectedGoals to member_goals table once member selection is implemented
+      toast.success("Goals saved!");
     }
-    // TODO: save selectedGoals to member_goals table once member selection is implemented
-    toast.success("Goals saved!");
+
+    saveSection("goals");
+    scrollToNextSection("goals");
   };
 
   if (loading) {
@@ -101,9 +116,9 @@ export default function GoalsSection() {
         <SelectedGoalsBar
           selectedGoals={selectedGoals}
           onRemoveGoal={(id) =>
-            setSelectedGoals((prev) => prev.filter((g) => g.id !== id))
+            setSelectedGoals(selectedGoals.filter((g) => g.id !== id))
           }
-          onDone={handleDone}
+          onDone={handleSaveGoals}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

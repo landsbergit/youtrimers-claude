@@ -54,11 +54,38 @@ export default function GoalsSection() {
     return map;
   }, [goalNodes]);
 
-  // Returns direct children (selectable goals) for a given category node_name
+  // Set of ids that are parents (i.e. have at least one child) — these are intermediate nodes
+  const parentIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const node of goalNodes) {
+      if (node.parent_id) set.add(node.parent_id);
+    }
+    return set;
+  }, [goalNodes]);
+
+  // Returns all leaf nodes (no children) in the subtree rooted at the given category node_name.
+  // Traverses the full hierarchy so intermediate layers (e.g. SKELETAL_HEALTH) are skipped.
   const goalsForCategory = (categoryNodeName: string): Goal[] => {
     const categoryId = nodeIdByName.get(categoryNodeName);
     if (!categoryId) return [];
-    return goalNodes.filter((g) => g.parent_id === categoryId);
+
+    // BFS: collect all descendant ids
+    const descendantIds = new Set<string>();
+    const queue = [categoryId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const node of goalNodes) {
+        if (node.parent_id === current) {
+          descendantIds.add(node.id);
+          queue.push(node.id);
+        }
+      }
+    }
+
+    // Return only leaf nodes (descendants that are not parents themselves)
+    return goalNodes.filter(
+      (g) => descendantIds.has(g.id) && !parentIds.has(g.id)
+    );
   };
 
   const isSelected = (goalId: string) =>

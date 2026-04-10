@@ -1,7 +1,9 @@
 import TopBar from "@/components/layout/TopBar";
 import HeroSection from "@/components/sections/HeroSection";
 import GoalsSection from "@/components/goals/GoalsSection";
+import ApproachSection from "@/components/sections/ApproachSection";
 import MatchesSection from "@/components/sections/MatchesSection";
+import CartSection from "@/components/sections/CartSection";
 
 const HomePage = () => {
   return (
@@ -24,19 +26,11 @@ const HomePage = () => {
         </div>
       </section>
 
-      <section id="approach" className="min-h-[50vh] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="font-heading text-foreground text-3xl">Approach</h2>
-        </div>
-      </section>
+      <ApproachSection />
 
       <MatchesSection />
 
-      <section id="cart" className="min-h-[50vh] px-4 py-20 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <h2 className="font-heading text-foreground text-3xl">Shopping Cart</h2>
-        </div>
-      </section>
+      <CartSection />
 
       <section id="about" className="min-h-[50vh] px-4 py-20 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">

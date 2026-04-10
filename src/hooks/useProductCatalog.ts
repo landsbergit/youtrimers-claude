@@ -25,7 +25,7 @@ export function useProductCatalog() {
         const { data: productRows, error: productError } = await supabase
           .from("products")
           .select(
-            "id, product_name, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd"
+            "id, product_name, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd, servings_per_container"
           )
           .eq("is_active", true)
           .range(from, from + PAGE_SIZE - 1);
@@ -39,7 +39,7 @@ export function useProductCatalog() {
         const { data: ingredientRows, error: ingError } = await supabase
           .from("product_ingredients")
           .select(
-            "product_id, ingredient_id, amount_per_serving, amount_unit, ingredients(ontology_node_id)"
+            "product_id, ingredient_id, amount_per_serving, amount_unit, ingredients(ontology_node_id, normalized_ingredient, ontology(is_active))"
           )
           .in("product_id", productIds);
 
@@ -48,14 +48,19 @@ export function useProductCatalog() {
         // Group ingredients by product_id
         const ingByProduct = new Map<number, ProductIngredient[]>();
         for (const row of ingredientRows ?? []) {
-          const nodeId =
-            (row.ingredients as { ontology_node_id: string | null } | null)
-              ?.ontology_node_id ?? "";
+          const ingRow = row.ingredients as {
+            ontology_node_id: string | null;
+            normalized_ingredient: string;
+            ontology: { is_active: boolean } | null;
+          } | null;
+          const nodeId = ingRow?.ontology_node_id ?? "";
           if (!nodeId) continue; // skip unlinked ingredients
+          if (ingRow?.ontology?.is_active === false) continue; // skip inactive nodes (e.g. IGNORE)
 
           const ing: ProductIngredient = {
             ingredientId: row.ingredient_id,
             ontologyNodeId: nodeId,
+            ingredientName: ingRow?.normalized_ingredient ?? "",
             amountPerServing: row.amount_per_serving ?? null,
             amountUnit: row.amount_unit ?? null,
           };
@@ -66,6 +71,11 @@ export function useProductCatalog() {
         }
 
         for (const p of productRows) {
+          // Exclude products without a valid, positive cost per serving.
+          const costUsd = p.cost_usd ?? null;
+          const servings = p.servings_per_container ?? null;
+          if (!costUsd || costUsd <= 0 || !servings || servings <= 0) continue;
+
           allProducts.push({
             id: p.id,
             productName: p.product_name,
@@ -73,7 +83,8 @@ export function useProductCatalog() {
             productUrl: p.product_url ?? null,
             normalizedDosageForm: p.normalized_dosage_form ?? null,
             normalizedTags: p.normalized_tags ?? [],
-            costUsd: p.cost_usd ?? null,
+            costUsd,
+            servingsPerContainer: servings,
             ingredients: ingByProduct.get(p.id) ?? [],
           });
         }

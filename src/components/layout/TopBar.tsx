@@ -21,35 +21,37 @@ const SECTION_IDS = NAV_ITEMS
   .map((item) => item.href.slice(1)); // strip the leading #
 
 /**
- * Tracks which section id is currently centred in the viewport.
- * Uses IntersectionObserver with a narrow root margin so only the section
- * occupying the middle of the screen is considered active.
+ * Tracks which section is currently active based on scroll position.
+ * Picks the section whose top edge is closest to (but still above) the
+ * viewport centre — deterministic and works for short bottom sections too.
  */
 function useActiveSection(): string | null {
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
-    const observers: IntersectionObserver[] = [];
+    const update = () => {
+      const centre = window.innerHeight / 2;
+      let bestId: string | null = null;
+      let bestTop = -Infinity;
 
-    SECTION_IDS.forEach((id) => {
-      const el = document.getElementById(id);
-      if (!el) return;
+      for (const id of SECTION_IDS) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const { top, bottom } = el.getBoundingClientRect();
+        // Section must have started scrolling into view (top ≤ centre)
+        // and not entirely scrolled past (bottom > 0)
+        if (top <= centre && bottom > 0 && top > bestTop) {
+          bestTop = top;
+          bestId = id;
+        }
+      }
 
-      const observer = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) {
-            setActiveSection(id);
-          }
-        },
-        // Trigger when the section crosses the centre band of the viewport
-        { rootMargin: "-45% 0px -45% 0px", threshold: 0 },
-      );
+      if (bestId) setActiveSection(bestId);
+    };
 
-      observer.observe(el);
-      observers.push(observer);
-    });
-
-    return () => observers.forEach((o) => o.disconnect());
+    update(); // initialise on mount
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
   }, []);
 
   return activeSection;

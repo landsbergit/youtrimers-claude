@@ -28,7 +28,7 @@ export function useRecommendations(profile: MemberProfile) {
   const { data: catalog } = useProductCatalog();
 
   return useQuery({
-    queryKey: ["recommendations", [...goalIds].sort().join(",")],
+    queryKey: ["recommendations", [...goalIds].sort().join(","), profile.qualityWeight, profile.maxBundleSize],
     staleTime: STALE_TIME,
     enabled: goalIds.length > 0 && catalog != null,
     queryFn: async (): Promise<RecommendationResult> => {
@@ -63,7 +63,10 @@ export function useRecommendations(profile: MemberProfile) {
       }
 
       // 4. Score products (catalog is guaranteed non-null because of `enabled` guard)
-      const rankedProducts = scoreProducts(catalog!, consolidated, nutrientDescendants);
+      const rankedProducts = scoreProducts(
+        catalog!, consolidated, nutrientDescendants,
+        profile.qualityWeight, profile.maxBundleSize,
+      );
 
       // 4. Persist audit trail (fire-and-forget — do not await)
       persistAudit(goalIds, consolidated, rankedProducts).catch((e) =>
@@ -80,10 +83,12 @@ async function persistAudit(
   consolidated: ConsolidatedRules,
   ranked: RankedProduct[]
 ) {
-  const rankedIds = ranked.map((r) => r.product.id);
+  // For audit purposes, flatten bundle product IDs into the ranked list
+  const rankedIds = ranked.flatMap((r) => r.products.map((p) => p.id));
   const breakdown: Record<string, unknown> = {};
   for (const r of ranked) {
-    breakdown[String(r.product.id)] = {
+    const key = r.products.map((p) => p.id).join("+");
+    breakdown[key] = {
       score: r.score,
       matched: r.matchedNutrientNodeIds,
       missed: r.missedNutrientNodeIds,

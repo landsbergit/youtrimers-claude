@@ -296,6 +296,7 @@ export type Database = {
           preferred_dose: number | null;
           unit: string | null;
           dose_priority: number;
+          enforce_level: 'requirement' | 'recommendation';
           notes: string | null;
           created_at: string;
         };
@@ -311,6 +312,7 @@ export type Database = {
           preferred_dose?: number | null;
           unit?: string | null;
           dose_priority?: number;
+          enforce_level?: 'requirement' | 'recommendation';
           notes?: string | null;
           created_at?: string;
         };
@@ -326,6 +328,7 @@ export type Database = {
           preferred_dose?: number | null;
           unit?: string | null;
           dose_priority?: number;
+          enforce_level?: 'requirement' | 'recommendation';
           notes?: string | null;
           created_at?: string;
         };
@@ -412,6 +415,7 @@ export type Database = {
           preferred_dose: number | null;
           unit: string | null;
           dose_priority: number;
+          enforce_level: 'requirement' | 'recommendation';
         }>;
       };
     };

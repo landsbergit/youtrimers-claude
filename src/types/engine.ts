@@ -18,6 +18,8 @@ export type ConflictStrategy = "accumulate" | "override" | "cap" | "avoid";
  */
 export interface MemberProfile {
   goalIds: string[]; // ontology node UUIDs of selected goals
+  qualityWeight: number; // 0 = rank by price, 1 = rank by match quality, default 0.5
+  maxBundleSize: number; // 1 = singles only, 2 = pairs, 3 = triplets. Default 2.
   // future: age?: number;
   // future: gender?: string;             // ontology node UUID
   // future: currentSupplementIds?: string[];
@@ -38,6 +40,8 @@ export interface RuleAction {
   preferredDose?: number | null;
   unit?: string | null;
   dosePriority: number;
+  /** Only meaningful for avoid_nutrient actions. */
+  enforceLevel: 'requirement' | 'recommendation';
 }
 
 export interface FiredRule {
@@ -63,6 +67,9 @@ export interface NutrientRequirement {
   preferredDose: number | null;
   unit: string | null;
   isRequired: boolean; // false = "avoid this nutrient"
+  /** For avoid entries: 'requirement' = hard filter (product excluded entirely);
+   *  'recommendation' = soft penalty (score × 0.5). */
+  enforceLevel: 'requirement' | 'recommendation';
   weight: number;
   contributingRuleIds: string[];
 }
@@ -84,6 +91,7 @@ export interface ConsolidatedRules {
 export interface ProductIngredient {
   ingredientId: number;
   ontologyNodeId: string; // UUID from ontology; empty string if unlinked
+  ingredientName: string; // normalized_ingredient text, for display
   amountPerServing: number | null;
   amountUnit: string | null;
 }
@@ -95,16 +103,19 @@ export interface ProductWithIngredients {
   productUrl: string | null;
   normalizedDosageForm: string | null;
   normalizedTags: string[];
-  costUsd: number | null;
+  costUsd: number;           // always positive — products without valid price are excluded from catalog
+  servingsPerContainer: number; // always positive
   ingredients: ProductIngredient[];
 }
 
 // ── Scoring output ─────────────────────────────────────────────────────────────
 
 export interface RankedProduct {
-  product: ProductWithIngredients;
+  /** One product for singles; two or three for bundles. */
+  products: ProductWithIngredients[];
   score: number; // 0–1
   matchedNutrientNodeIds: string[];
   missedNutrientNodeIds: string[];
+  extraIngredientNames: string[]; // linked ingredients not covering any requirement
   scoreBreakdown: Record<string, number>; // nutrientNodeId → contribution
 }

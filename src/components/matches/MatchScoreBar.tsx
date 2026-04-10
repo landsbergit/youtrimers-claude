@@ -7,13 +7,13 @@ interface MatchScoreBarProps {
  * Colour: green ≥ 0.7, amber 0.4–0.7, muted < 0.4.
  */
 export function MatchScoreBar({ score }: MatchScoreBarProps) {
-  const pct = Math.round(score * 100);
+  const pct = Math.round(score * 1000) / 10; // one decimal, e.g. 93.4
 
   const colour =
     pct >= 70
-      ? "bg-green-500"
+      ? "bg-success"
       : pct >= 40
-      ? "bg-amber-400"
+      ? "bg-warning"
       : "bg-muted-foreground/40";
 
   return (
@@ -24,7 +24,7 @@ export function MatchScoreBar({ score }: MatchScoreBarProps) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="text-xs font-medium text-muted-foreground w-8 text-right">
+      <span className="text-xs font-medium text-muted-foreground w-10 text-right">
         {pct}%
       </span>
     </div>

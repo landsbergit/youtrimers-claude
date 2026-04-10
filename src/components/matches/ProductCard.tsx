@@ -1,7 +1,11 @@
+import { useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { RankedProduct } from "@/types/engine";
+import { useCart } from "@/context/CartContext";
 import { MatchScoreBar } from "./MatchScoreBar";
 import { NutrientMatchPill } from "./NutrientMatchPill";
+import { ExtraIngredientsPill } from "./ExtraIngredientsPill";
+import { AddToCartButton } from "./AddToCartButton";
 
 interface ProductCardProps {
   rank: number;
@@ -11,7 +15,13 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardProps) {
-  const { product, score, matchedNutrientNodeIds, missedNutrientNodeIds } = rankedProduct;
+  const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames } = rankedProduct;
+  const product = products[0];
+  const { isInCart } = useCart();
+  const inCart = isInCart(product.id);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [titleExpanded, setTitleExpanded] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Show at most 6 nutrient pills to keep the card compact
   const allNutrients = [
@@ -19,20 +29,55 @@ export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardP
     ...missedNutrientNodeIds.map((id) => ({ id, matched: false })),
   ].slice(0, 6);
 
+  const openPopup = () => {
+    clearTimeout(closeTimer.current);
+    setPopupOpen(true);
+  };
+
+  const scheduleClose = () => {
+    // Small delay so moving from thumbnail → popup doesn't flicker
+    closeTimer.current = setTimeout(() => setPopupOpen(false), 80);
+  };
+
   return (
-    <div className="rounded-xl border border-border bg-card p-4 hover:border-primary/40 transition-colors">
+    <div className={`rounded-xl border p-4 transition-colors ${
+      inCart
+        ? "bg-[#E3EFE9] border-[#22A68C]"
+        : "bg-card border-border hover:border-primary/40"
+    }`}>
       <div className="flex gap-4">
-        {/* Product image */}
-        <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-muted border border-border">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.productName}
-              className="w-full h-full object-contain p-1"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-              No img
+        {/* Product image with hover zoom popup */}
+        <div className="relative flex-shrink-0">
+          <div
+            className="w-16 h-16 rounded-lg overflow-hidden bg-muted border border-border cursor-zoom-in"
+            onMouseEnter={product.imageUrl ? openPopup : undefined}
+            onMouseLeave={product.imageUrl ? scheduleClose : undefined}
+          >
+            {product.imageUrl ? (
+              <img
+                src={product.imageUrl}
+                alt={product.productName}
+                className="w-full h-full object-contain p-1"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+                No img
+              </div>
+            )}
+          </div>
+
+          {/* Enlarged popup — extends beyond card boundaries via z-50 */}
+          {popupOpen && product.imageUrl && (
+            <div
+              className="absolute -top-8 left-20 z-50 w-80 h-80 rounded-xl border border-border bg-card shadow-2xl p-2"
+              onMouseEnter={openPopup}
+              onMouseLeave={scheduleClose}
+            >
+              <img
+                src={product.imageUrl}
+                alt={product.productName}
+                className="w-full h-full object-contain"
+              />
             </div>
           )}
         </div>
@@ -44,7 +89,12 @@ export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardP
               <span className="text-xs font-bold text-muted-foreground w-5 flex-shrink-0">
                 #{rank}
               </span>
-              <p className="text-sm font-medium text-foreground leading-snug line-clamp-2">
+              <p
+                onClick={() => setTitleExpanded((v) => !v)}
+                className={`text-sm font-medium text-foreground leading-snug min-h-[2.5rem] cursor-pointer select-none ${
+                  titleExpanded ? "" : "line-clamp-2"
+                }`}
+              >
                 {product.productName}
               </p>
             </div>
@@ -65,21 +115,23 @@ export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardP
             <MatchScoreBar score={score} />
           </div>
 
-          {product.costUsd != null && (
-            <p className="text-xs text-muted-foreground mt-1">
-              ${product.costUsd.toFixed(2)}
-              {product.normalizedDosageForm && (
-                <span className="ml-2 capitalize">
-                  · {product.normalizedDosageForm.toLowerCase()}
-                </span>
-              )}
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            <span className="font-medium text-foreground">
+              ${(product.costUsd / product.servingsPerContainer).toFixed(2)}/serving
+              <span className="font-normal"> · </span>
+            </span>
+            ${product.costUsd.toFixed(2)} total
+            {product.normalizedDosageForm && (
+              <span className="ml-2 capitalize">
+                · {product.normalizedDosageForm.toLowerCase()}
+              </span>
+            )}
+          </p>
         </div>
       </div>
 
-      {/* Nutrient match pills */}
-      {allNutrients.length > 0 && (
+      {/* Nutrient match pills + extra ingredients */}
+      {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {allNutrients.map(({ id, matched }) => (
             <NutrientMatchPill
@@ -88,8 +140,14 @@ export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardP
               matched={matched}
             />
           ))}
+          <ExtraIngredientsPill names={extraIngredientNames} />
         </div>
       )}
+
+      {/* Cart control */}
+      <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+        <AddToCartButton product={product} />
+      </div>
     </div>
   );
 }

@@ -25,6 +25,14 @@ interface RecommendationContextType {
   selectedGoals: Goal[];
   setSelectedGoals: (goals: Goal[]) => void;
 
+  // Approach (section 4): 0 = full price priority, 1 = full quality priority
+  qualityWeight: number;
+  setQualityWeight: (w: number) => void;
+
+  // Bundle size: 1 = singles only, 2 = pairs (default), 3 = triplets
+  maxBundleSize: number;
+  setMaxBundleSize: (n: number) => void;
+
   // Which sections have been saved
   savedSections: Set<SectionKey>;
   saveSection: (key: SectionKey) => void;
@@ -40,6 +48,8 @@ const RecommendationContext = createContext<RecommendationContextType | null>(nu
 
 export function RecommendationProvider({ children }: { children: ReactNode }) {
   const [selectedGoals, setSelectedGoals] = useState<Goal[]>([]);
+  const [qualityWeight, setQualityWeight] = useState<number>(0.5); // Balanced default
+  const [maxBundleSize, setMaxBundleSize] = useState<number>(2);
   const [savedSections, setSavedSections] = useState<Set<SectionKey>>(new Set());
 
   const saveSection = useCallback((key: SectionKey) => {
@@ -74,6 +84,10 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
       value={{
         selectedGoals,
         setSelectedGoals,
+        qualityWeight,
+        setQualityWeight,
+        maxBundleSize,
+        setMaxBundleSize,
         savedSections,
         saveSection,
         goalIds,

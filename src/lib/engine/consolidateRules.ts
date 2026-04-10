@@ -36,7 +36,10 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
     }
   >();
 
-  const avoidSet = new Map<string, { priority: number; ruleId: string }>();
+  const avoidSet = new Map<
+    string,
+    { priority: number; ruleId: string; enforceLevel: 'requirement' | 'recommendation' }
+  >();
   const preferredTags = new Set<string>();
   const avoidedTags = new Set<string>();
   const preferredForms = new Set<string>();
@@ -101,8 +104,20 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
           if (!action.nutrientNodeId) break;
           const nid = action.nutrientNodeId;
           const existing = avoidSet.get(nid);
+          // Escalate to 'requirement' if any rule for this nutrient demands it.
+          const newLevel =
+            action.enforceLevel === 'requirement' || existing?.enforceLevel === 'requirement'
+              ? 'requirement'
+              : 'recommendation';
           if (!existing || rule.priority < existing.priority) {
-            avoidSet.set(nid, { priority: rule.priority, ruleId: rule.ruleId });
+            avoidSet.set(nid, {
+              priority: rule.priority,
+              ruleId: rule.ruleId,
+              enforceLevel: newLevel,
+            });
+          } else if (newLevel === 'requirement') {
+            // Same or lower priority but stricter enforcement — upgrade level only
+            existing.enforceLevel = 'requirement';
           }
           break;
         }
@@ -137,6 +152,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
         preferredDose: null,
         unit: null,
         isRequired: false,
+        enforceLevel: avoid.enforceLevel,
         weight: 1 / avoid.priority,
         contributingRuleIds: [avoid.ruleId],
       });
@@ -144,7 +160,6 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
     } else {
       // Require wins (or no conflict)
       if (req.minDose != null && req.maxDose != null && req.minDose > req.maxDose) {
-        // Authoring error: floor > ceiling. Safety first: cap the floor.
         console.warn(
           `[consolidateRules] min_dose > max_dose for nutrient ${nid}. Clamping min to max.`
         );
@@ -158,6 +173,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
         preferredDose: req.preferredDose,
         unit: req.unit,
         isRequired: true,
+        enforceLevel: 'recommendation', // not applicable for required nutrients
         weight: req.weight,
         contributingRuleIds: req.ruleIds,
       });
@@ -175,6 +191,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
       preferredDose: null,
       unit: null,
       isRequired: false,
+      enforceLevel: avoid.enforceLevel,
       weight: 1 / avoid.priority,
       contributingRuleIds: [avoid.ruleId],
     });
@@ -214,6 +231,7 @@ export function groupRpcRowsIntoFiredRules(
     preferred_dose: number | null;
     unit: string | null;
     dose_priority: number;
+    enforce_level: string | null;
   }>
 ): FiredRule[] {
   const ruleMap = new Map<string, FiredRule>();
@@ -244,6 +262,7 @@ export function groupRpcRowsIntoFiredRules(
       preferredDose: row.preferred_dose,
       unit: row.unit,
       dosePriority: row.dose_priority,
+      enforceLevel: row.enforce_level === 'requirement' ? 'requirement' : 'recommendation',
     };
     rule.actions.push(action);
   }

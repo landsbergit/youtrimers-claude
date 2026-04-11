@@ -45,10 +45,120 @@ export type Database = {
           },
         ];
       };
+      member_health_conditions: {
+        Row: {
+          id: string;
+          member_id: string;
+          node_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          node_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          node_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_health_conditions_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_health_conditions_node_id_fkey";
+            columns: ["node_id"];
+            isOneToOne: false;
+            referencedRelation: "ontology";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      member_current_supplements: {
+        Row: {
+          id: string;
+          member_id: string;
+          product_id: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          product_id: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          product_id?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_current_supplements_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_current_supplements_product_id_fkey";
+            columns: ["product_id"];
+            isOneToOne: false;
+            referencedRelation: "products";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      member_medications: {
+        Row: {
+          id: string;
+          member_id: string;
+          ontology_node_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          ontology_node_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          ontology_node_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_medications_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_medications_ontology_node_id_fkey";
+            columns: ["ontology_node_id"];
+            isOneToOne: false;
+            referencedRelation: "ontology";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       members: {
         Row: {
           age: number | null;
           avatar_url: string | null;
+          birth_year: number | null;
+          birth_month: number | null;
           created_at: string;
           display_name: string | null;
           id: string;
@@ -60,6 +170,8 @@ export type Database = {
         Insert: {
           age?: number | null;
           avatar_url?: string | null;
+          birth_year?: number | null;
+          birth_month?: number | null;
           created_at?: string;
           display_name?: string | null;
           id?: string;
@@ -71,6 +183,8 @@ export type Database = {
         Update: {
           age?: number | null;
           avatar_url?: string | null;
+          birth_year?: number | null;
+          birth_month?: number | null;
           created_at?: string;
           display_name?: string | null;
           id?: string;
@@ -118,6 +232,7 @@ export type Database = {
         Row: {
           id: number;
           product_name: string;
+          brand: string | null;
           product_url: string | null;
           product_code: string | null;
           upc: string | null;
@@ -133,6 +248,7 @@ export type Database = {
         Insert: {
           id?: number;
           product_name: string;
+          brand?: string | null;
           product_url?: string | null;
           product_code?: string | null;
           upc?: string | null;
@@ -148,6 +264,7 @@ export type Database = {
         Update: {
           id?: number;
           product_name?: string;
+          brand?: string | null;
           product_url?: string | null;
           product_code?: string | null;
           upc?: string | null;
@@ -401,6 +518,7 @@ export type Database = {
         Returns: Array<{
           rule_id: string;
           rule_name: string;
+          rule_description: string | null;
           trigger_node_id: string;
           priority: number;
           conflict_strategy: string;

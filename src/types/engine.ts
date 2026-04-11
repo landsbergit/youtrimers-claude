@@ -17,13 +17,30 @@ export type ConflictStrategy = "accumulate" | "override" | "cap" | "avoid";
  * For MVP only goalIds is populated; future fields are listed for extensibility.
  */
 export interface MemberProfile {
+  // ── Section 1: Goals ──────────────────────────────────────────────────────
   goalIds: string[]; // ontology node UUIDs of selected goals
+
+  // ── Section 2: Profile ────────────────────────────────────────────────────
+  /** "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY" | null (unknown) */
+  gender: string | null;
+  /** Ontology node_name of the selected reproductive status, e.g. "PREGNANCY". null = none. */
+  reproductiveStatus: string | null;
+  birthYear: number | null;
+  birthMonth: number | null; // 1-indexed; null when not provided
+
+  // ── Section 3: Preferences ────────────────────────────────────────────────
+  /** Leaf-level node_names of accepted dosage forms. Empty = no filter. */
+  acceptedDosageFormNames: string[];
+
+  // ── Approach ──────────────────────────────────────────────────────────────
   qualityWeight: number; // 0 = rank by price, 1 = rank by match quality, default 0.5
   maxBundleSize: number; // 1 = singles only, 2 = pairs, 3 = triplets. Default 2.
-  // future: age?: number;
-  // future: gender?: string;             // ontology node UUID
-  // future: currentSupplementIds?: string[];
-  // future: approachTagIds?: string[];   // e.g. VEGAN, ORGANIC
+
+  // future: foodRestrictions?: string[];     // e.g. VEGAN, GLUTEN_FREE
+  // future: foodPreferences?: string[];      // e.g. ORGANIC, NON_GMO
+  // future: healthConditionIds?: string[];   // ontology node UUIDs
+  // future: medicationIds?: string[];        // ontology node UUIDs
+  // future: currentSupplementIds?: number[]; // product IDs
 }
 
 // ── Rule data (from DB via RPC) ────────────────────────────────────────────────
@@ -47,6 +64,7 @@ export interface RuleAction {
 export interface FiredRule {
   ruleId: string;
   ruleName: string;
+  description: string | null;
   triggerNodeId: string;
   priority: number;
   conflictStrategy: ConflictStrategy;
@@ -72,6 +90,8 @@ export interface NutrientRequirement {
   enforceLevel: 'requirement' | 'recommendation';
   weight: number;
   contributingRuleIds: string[];
+  /** Human-readable explanations from each contributing rule's description field. */
+  contributingRuleDescriptions: string[];
 }
 
 /**
@@ -99,6 +119,7 @@ export interface ProductIngredient {
 export interface ProductWithIngredients {
   id: number;
   productName: string;
+  brand: string | null;
   imageUrl: string | null;
   productUrl: string | null;
   normalizedDosageForm: string | null;

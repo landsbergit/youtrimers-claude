@@ -1,24 +1,48 @@
-import { useState } from "react";
-import { ExternalLink, Package } from "lucide-react";
+import { useState, useRef } from "react";
+import { ExternalLink, Package, Check, ShoppingCart } from "lucide-react";
 import type { RankedProduct } from "@/types/engine";
 import { useCart } from "@/context/CartContext";
 import { MatchScoreBar } from "./MatchScoreBar";
 import { NutrientMatchPill } from "./NutrientMatchPill";
 import { ExtraIngredientsPill } from "./ExtraIngredientsPill";
-import { AddToCartButton } from "./AddToCartButton";
 
 interface BundleCardProps {
   rank: number;
   rankedProduct: RankedProduct;
   nutrientNames: Map<string, string>;
+  nutrientDescriptions: Map<string, string>;
 }
 
-export function BundleCard({ rank, rankedProduct, nutrientNames }: BundleCardProps) {
+export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions }: BundleCardProps) {
   const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames } = rankedProduct;
-  const { isInCart } = useCart();
+  const { isInCart, addToCart } = useCart();
   const allInCart = products.every((p) => isInCart(p.id));
 
+  const handleAddBundle = () => {
+    for (const p of products) {
+      addToCart({
+        productId: p.id,
+        productName: p.productName,
+        imageUrl: p.imageUrl,
+        productUrl: p.productUrl,
+        costUsd: p.costUsd,
+        servingsPerContainer: p.servingsPerContainer,
+        normalizedDosageForm: p.normalizedDosageForm,
+      });
+    }
+  };
+
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const [popupIndex, setPopupIndex] = useState<number | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  const openPopup = (i: number) => {
+    clearTimeout(closeTimer.current);
+    setPopupIndex(i);
+  };
+  const scheduleClose = () => {
+    closeTimer.current = setTimeout(() => setPopupIndex(null), 80);
+  };
 
   const allNutrients = [
     ...matchedNutrientNodeIds.map((id) => ({ id, matched: true })),
@@ -41,23 +65,44 @@ export function BundleCard({ rank, rankedProduct, nutrientNames }: BundleCardPro
     >
       {/* Header row: rank + bundle label + images + score */}
       <div className="flex items-start gap-3">
-        {/* Stacked thumbnails */}
+        {/* Stacked thumbnails with hover-zoom popup */}
         <div className="flex-shrink-0 flex items-center">
           {products.map((p, i) => (
             <div
               key={p.id}
-              className="w-12 h-12 rounded-lg overflow-hidden bg-muted border border-border"
-              style={{ marginLeft: i > 0 ? "-8px" : 0, zIndex: products.length - i }}
+              className="relative"
+              style={{ marginLeft: i > 0 ? "-8px" : 0, zIndex: popupIndex === i ? 60 : products.length - i }}
             >
-              {p.imageUrl ? (
-                <img
-                  src={p.imageUrl}
-                  alt={p.productName}
-                  className="w-full h-full object-contain p-0.5"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[9px]">
-                  No img
+              <div
+                className="w-12 h-12 rounded-lg overflow-hidden bg-muted border border-border cursor-zoom-in"
+                onMouseEnter={p.imageUrl ? () => openPopup(i) : undefined}
+                onMouseLeave={p.imageUrl ? scheduleClose : undefined}
+              >
+                {p.imageUrl ? (
+                  <img
+                    src={p.imageUrl}
+                    alt={p.productName}
+                    className="w-full h-full object-contain p-0.5"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[9px]">
+                    No img
+                  </div>
+                )}
+              </div>
+
+              {/* Enlarged popup */}
+              {popupIndex === i && p.imageUrl && (
+                <div
+                  className="absolute -top-8 left-14 z-50 w-80 h-80 rounded-xl border border-border bg-card shadow-2xl p-2"
+                  onMouseEnter={() => openPopup(i)}
+                  onMouseLeave={scheduleClose}
+                >
+                  <img
+                    src={p.imageUrl}
+                    alt={p.productName}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               )}
             </div>
@@ -145,22 +190,30 @@ export function BundleCard({ rank, rankedProduct, nutrientNames }: BundleCardPro
               key={id}
               label={nutrientNames.get(id) ?? id}
               matched={matched}
+              tooltip={nutrientDescriptions.get(id)}
             />
           ))}
           <ExtraIngredientsPill names={extraIngredientNames} />
         </div>
       )}
 
-      {/* Per-product cart controls */}
-      <div className="mt-3 pt-3 border-t border-border space-y-2">
-        {products.map((p) => (
-          <div key={p.id} className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
-              {p.productName}
-            </span>
-            <AddToCartButton product={p} />
-          </div>
-        ))}
+      {/* Single bundle cart control */}
+      <div className="mt-3 pt-3 border-t border-border">
+        {allInCart ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <Check size={12} strokeWidth={3} />
+            Bundle in cart
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={handleAddBundle}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+          >
+            <ShoppingCart size={13} />
+            Add to cart
+          </button>
+        )}
       </div>
     </div>
   );

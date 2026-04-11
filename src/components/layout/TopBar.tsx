@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: "Supplements", mobileLabel: "Current Supplements", href: "#supplements", tooltip: "Assess your current supplements" },
   { label: "Goals",        href: "#goals",       tooltip: "Choose your health, sports, and beauty goals" },
   { label: "Profile",      href: "#profile",     tooltip: "Fill out your profile to unlock better matches" },
+  { label: "Preferences",  href: "#preferences", tooltip: "Choose your preferred dosage forms" },
   { label: "Approach",     href: "#approach",    tooltip: "Take control of how you supplement" },
   { label: "Matches",      href: "#matches",     tooltip: "Discover off-the-shelf products matching your needs and goals", highlight: true, spaceBefore: true },
   { label: "Cart",         href: "#cart",        tooltip: "Your shopping cart", icon: "cart", spaceBefore: true },

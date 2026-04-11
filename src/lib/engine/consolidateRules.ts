@@ -33,6 +33,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
       weight: number; // 1 / min(rule priority) for this nutrient
       minPriority: number;
       ruleIds: string[];
+      descriptions: string[];
     }
   >();
 
@@ -66,6 +67,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
               weight: 1 / rule.priority,
               minPriority: rule.priority,
               ruleIds: [rule.ruleId],
+              descriptions: rule.description ? [rule.description] : [],
             });
           } else {
             // Accumulate: max of minimums, min of maximums
@@ -96,6 +98,9 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
               existing.weight = 1 / rule.priority;
             }
             existing.ruleIds.push(rule.ruleId);
+            if (rule.description && !existing.descriptions.includes(rule.description)) {
+              existing.descriptions.push(rule.description);
+            }
           }
           break;
         }
@@ -155,6 +160,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
         enforceLevel: avoid.enforceLevel,
         weight: 1 / avoid.priority,
         contributingRuleIds: [avoid.ruleId],
+        contributingRuleDescriptions: [],
       });
       avoidSet.delete(nid); // consumed
     } else {
@@ -176,6 +182,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
         enforceLevel: 'recommendation', // not applicable for required nutrients
         weight: req.weight,
         contributingRuleIds: req.ruleIds,
+        contributingRuleDescriptions: req.descriptions,
       });
       avoidSet.delete(nid);
     }
@@ -194,6 +201,7 @@ export function consolidateRules(firedRules: FiredRule[]): ConsolidatedRules {
       enforceLevel: avoid.enforceLevel,
       weight: 1 / avoid.priority,
       contributingRuleIds: [avoid.ruleId],
+      contributingRuleDescriptions: [],
     });
   }
 
@@ -217,6 +225,7 @@ export function groupRpcRowsIntoFiredRules(
   rows: Array<{
     rule_id: string;
     rule_name: string;
+    rule_description: string | null;
     trigger_node_id: string;
     priority: number;
     conflict_strategy: string;
@@ -242,6 +251,7 @@ export function groupRpcRowsIntoFiredRules(
       rule = {
         ruleId: row.rule_id,
         ruleName: row.rule_name,
+        description: row.rule_description ?? null,
         triggerNodeId: row.trigger_node_id,
         priority: row.priority,
         conflictStrategy: row.conflict_strategy as FiredRule["conflictStrategy"],

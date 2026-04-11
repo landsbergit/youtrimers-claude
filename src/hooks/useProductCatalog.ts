@@ -25,7 +25,7 @@ export function useProductCatalog() {
         const { data: productRows, error: productError } = await supabase
           .from("products")
           .select(
-            "id, product_name, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd, servings_per_container"
+            "id, product_name, brand, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd, servings_per_container"
           )
           .eq("is_active", true)
           .range(from, from + PAGE_SIZE - 1);
@@ -79,6 +79,7 @@ export function useProductCatalog() {
           allProducts.push({
             id: p.id,
             productName: p.product_name,
+            brand: p.brand ?? null,
             imageUrl: p.image_url ?? null,
             productUrl: p.product_url ?? null,
             normalizedDosageForm: p.normalized_dosage_form ?? null,

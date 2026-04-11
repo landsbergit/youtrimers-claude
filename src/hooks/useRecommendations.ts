@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { groupRpcRowsIntoFiredRules, consolidateRules } from "@/lib/engine/consolidateRules";
 import { scoreProducts } from "@/lib/engine/scoreProducts";
+import { applyDemographicFilter } from "@/lib/engine/applyDemographicFilter";
 import { useProductCatalog } from "./useProductCatalog";
 import type { MemberProfile, RankedProduct, ConsolidatedRules } from "@/types/engine";
 
@@ -10,6 +11,8 @@ const STALE_TIME = 5 * 60 * 1000; // 5 minutes — rules change rarely
 export interface RecommendationResult {
   rankedProducts: RankedProduct[];
   consolidatedRules: ConsolidatedRules;
+  /** True when the dosage form filter produced zero results and was bypassed. */
+  dosageFormFallback: boolean;
 }
 
 /**
@@ -28,7 +31,17 @@ export function useRecommendations(profile: MemberProfile) {
   const { data: catalog } = useProductCatalog();
 
   return useQuery({
-    queryKey: ["recommendations", [...goalIds].sort().join(","), profile.qualityWeight, profile.maxBundleSize],
+    queryKey: [
+      "recommendations",
+      [...goalIds].sort().join(","),
+      profile.qualityWeight,
+      profile.maxBundleSize,
+      [...profile.acceptedDosageFormNames].sort().join(","),
+      profile.gender ?? "",
+      profile.reproductiveStatus ?? "",
+      profile.birthYear ?? "",
+      profile.birthMonth ?? "",
+    ],
     staleTime: STALE_TIME,
     enabled: goalIds.length > 0 && catalog != null,
     queryFn: async (): Promise<RecommendationResult> => {
@@ -62,18 +75,46 @@ export function useRecommendations(profile: MemberProfile) {
         }
       }
 
-      // 4. Score products (catalog is guaranteed non-null because of `enabled` guard)
+      // 4. Apply demographic hard-exclusion filter
+      //    Runs before dosage-form filter so the form fallback logic operates
+      //    on the already-demographically-filtered set.
+      const demographicCatalog = applyDemographicFilter(
+        catalog!,
+        profile.gender,
+        profile.reproductiveStatus,
+        profile.birthYear,
+        profile.birthMonth,
+      );
+
+      // 5. Apply dosage form pre-filter when preferences have been set
+      let scoringCatalog = demographicCatalog;
+      let dosageFormFallback = false;
+
+      if (profile.acceptedDosageFormNames.length > 0) {
+        const acceptedSet = new Set(profile.acceptedDosageFormNames);
+        const filtered = demographicCatalog.filter(
+          (p) => p.normalizedDosageForm === null || acceptedSet.has(p.normalizedDosageForm),
+        );
+        if (filtered.length > 0) {
+          scoringCatalog = filtered;
+        } else {
+          // All products with a known form are excluded — fall back to full catalog
+          dosageFormFallback = true;
+        }
+      }
+
+      // 5. Score products
       const rankedProducts = scoreProducts(
-        catalog!, consolidated, nutrientDescendants,
+        scoringCatalog, consolidated, nutrientDescendants,
         profile.qualityWeight, profile.maxBundleSize,
       );
 
-      // 4. Persist audit trail (fire-and-forget — do not await)
+      // 6. Persist audit trail (fire-and-forget — do not await)
       persistAudit(goalIds, consolidated, rankedProducts).catch((e) =>
         console.warn("[useRecommendations] audit insert failed:", e)
       );
 
-      return { rankedProducts, consolidatedRules: consolidated };
+      return { rankedProducts, consolidatedRules: consolidated, dosageFormFallback };
     },
   });
 }

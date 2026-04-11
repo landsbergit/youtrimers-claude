@@ -12,9 +12,11 @@ interface ProductCardProps {
   rankedProduct: RankedProduct;
   /** Map from ontology node UUID → display_name for labelling nutrient pills */
   nutrientNames: Map<string, string>;
+  /** Map from ontology node UUID → tooltip text (joined rule descriptions) */
+  nutrientDescriptions: Map<string, string>;
 }
 
-export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardProps) {
+export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions }: ProductCardProps) {
   const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames } = rankedProduct;
   const product = products[0];
   const { isInCart } = useCart();
@@ -138,6 +140,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames }: ProductCardP
               key={id}
               label={nutrientNames.get(id) ?? id}
               matched={matched}
+              tooltip={nutrientDescriptions.get(id)}
             />
           ))}
           <ExtraIngredientsPill names={extraIngredientNames} />

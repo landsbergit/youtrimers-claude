@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRecommendationContext, SECTION_ORDER, SECTION_LABELS, type SectionKey } from "@/context/RecommendationContext";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
@@ -6,7 +6,8 @@ import { ProductCard } from "@/components/matches/ProductCard";
 import { BundleCard } from "@/components/matches/BundleCard";
 import { ProductCardSkeleton } from "@/components/matches/ProductCardSkeleton";
 import { MatchesEmptyState } from "@/components/matches/MatchesEmptyState";
-import { CheckCircle2, Circle, ChevronRight } from "lucide-react";
+import { diversifyResults } from "@/lib/engine/diversifyResults";
+import { CheckCircle2, Circle, ChevronRight, AlertTriangle } from "lucide-react";
 
 const DISCRETE_LABELS: { value: number; label: string }[] = [
   { value: 0.1, label: "Budget" },
@@ -23,14 +24,31 @@ function approachLabel(qualityWeight: number): string {
 const MAX_DISPLAYED = 10;
 
 export default function MatchesSection() {
-  const { goalIds, qualityWeight, maxBundleSize, setMaxBundleSize, savedSections } =
-    useRecommendationContext();
+  const {
+    goalIds,
+    qualityWeight,
+    maxBundleSize,
+    setMaxBundleSize,
+    diversityWeight,
+    setDiversityWeight,
+    savedSections,
+    acceptedDosageFormNames,
+    gender,
+    reproductiveStatus,
+    birthYear,
+    birthMonth,
+  } = useRecommendationContext();
   const hasAnySection = savedSections.size > 0;
 
   const { data: result, isLoading: isRecommending } = useRecommendations({
     goalIds,
     qualityWeight,
     maxBundleSize,
+    acceptedDosageFormNames,
+    gender,
+    reproductiveStatus,
+    birthYear,
+    birthMonth,
   });
 
   // Preload the catalog while the user browses (non-blocking)
@@ -47,8 +65,34 @@ export default function MatchesSection() {
     return map;
   }, [result]);
 
+  // Build a tooltip-text lookup: nutrientNodeId → joined rule descriptions
+  const nutrientDescriptions = useMemo(() => {
+    const map = new Map<string, string>();
+    if (result?.consolidatedRules.requirements) {
+      for (const req of result.consolidatedRules.requirements) {
+        if (req.contributingRuleDescriptions.length > 0) {
+          map.set(
+            req.nutrientNodeId,
+            req.contributingRuleDescriptions
+              .map((d, i) => (req.contributingRuleDescriptions.length > 1 ? `${i + 1}. ${d}` : d))
+              .join("\n\n"),
+          );
+        }
+      }
+    }
+    return map;
+  }, [result]);
+
+  // MMR diversity re-ranking — pure display transform, no query re-fetch
+  // lambda: 1 = Focused (pure relevance), 0 = Diverse. We invert diversityWeight so
+  // that higher diversityWeight = more diversity = lower lambda.
+  const lambda = 1 - diversityWeight;
+  const rankedProducts = useMemo(() => {
+    const raw = result?.rankedProducts ?? [];
+    return diversifyResults(raw, lambda, raw.length);
+  }, [result, lambda]);
+
   const allSectionsSaved = SECTION_ORDER.every((s) => savedSections.has(s));
-  const rankedProducts = result?.rankedProducts ?? [];
 
   return (
     <section id="matches" className="px-4 py-20 sm:px-6 lg:px-8">
@@ -61,13 +105,29 @@ export default function MatchesSection() {
             </p>
           </div>
 
-          {/* Bundle size controller */}
-          <BundleSizeControl value={maxBundleSize} onChange={setMaxBundleSize} />
+          {/* Controls row */}
+          <div className="flex flex-wrap items-end gap-3">
+            <DiversityControl value={diversityWeight} onChange={setDiversityWeight} />
+            <BundleSizeControl value={maxBundleSize} onChange={setMaxBundleSize} />
+          </div>
         </div>
 
         {/* Personalization summary card */}
         {hasAnySection && (
           <PersonalizationProgress savedSections={savedSections} />
+        )}
+
+        {/* Dosage form fallback warning */}
+        {result?.dosageFormFallback && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+            <AlertTriangle size={16} className="flex-shrink-0 mt-0.5 text-warning" />
+            <span>
+              No products matched your dosage form preferences — showing all forms instead.{" "}
+              <a href="#preferences" className="underline underline-offset-2 hover:opacity-80">
+                Update preferences
+              </a>
+            </span>
+          </div>
         )}
 
         {/* Content */}
@@ -98,6 +158,7 @@ export default function MatchesSection() {
                     rank={idx + 1}
                     rankedProduct={rp}
                     nutrientNames={nutrientNames}
+                    nutrientDescriptions={nutrientDescriptions}
                   />
                 ) : (
                   <ProductCard
@@ -105,6 +166,7 @@ export default function MatchesSection() {
                     rank={idx + 1}
                     rankedProduct={rp}
                     nutrientNames={nutrientNames}
+                    nutrientDescriptions={nutrientDescriptions}
                   />
                 );
               })}
@@ -118,6 +180,79 @@ export default function MatchesSection() {
         )}
       </div>
     </section>
+  );
+}
+
+// ── Diversity control ─────────────────────────────────────────────────────────
+
+const DIVERSITY_OPTIONS: { value: number; label: string; title: string }[] = [
+  { value: 0, label: "Focused", title: "Show the highest-scoring results (no diversity re-ranking)" },
+  { value: 0.5, label: "Balanced", title: "Balance relevance with variety" },
+  { value: 1, label: "Diverse", title: "Maximise variety across brands and nutrients" },
+];
+
+function DiversityControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (w: number) => void;
+}) {
+  const [showSlider, setShowSlider] = useState(false);
+
+  // Snap to nearest discrete option for display purposes
+  const activeOption =
+    DIVERSITY_OPTIONS.find((o) => o.value === value) ?? null;
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Diversity</span>
+        <button
+          type="button"
+          onClick={() => setShowSlider((v) => !v)}
+          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+          title={showSlider ? "Show presets" : "More precision"}
+        >
+          {showSlider ? "Presets" : "More precision"}
+        </button>
+      </div>
+
+      {showSlider ? (
+        <div className="flex items-center gap-2 h-[30px]">
+          <span className="text-xs text-muted-foreground w-14 text-right">
+            {activeOption?.label ?? `${Math.round(value * 100)}%`}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={value}
+            onChange={(e) => onChange(Number(e.target.value))}
+            className="w-28 accent-primary"
+          />
+        </div>
+      ) : (
+        <div className="flex items-center rounded-lg border border-border overflow-hidden">
+          {DIVERSITY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              title={opt.title}
+              onClick={() => onChange(opt.value)}
+              className={`px-3 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border whitespace-nowrap ${
+                value === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -163,7 +298,7 @@ function BundleSizeControl({
 // ── Personalization progress ───────────────────────────────────────────────────
 
 function PersonalizationProgress({ savedSections }: { savedSections: Set<SectionKey> }) {
-  const { selectedGoals, qualityWeight } = useRecommendationContext();
+  const { selectedGoals, qualityWeight, acceptedDosageFormNames } = useRecommendationContext();
   const savedCount = savedSections.size;
 
   function sectionSummary(s: SectionKey): React.ReactNode {
@@ -182,6 +317,14 @@ function PersonalizationProgress({ savedSections }: { savedSections: Set<Section
             </span>
           ))}
         </div>
+      );
+    }
+
+    if (s === "preferences" && acceptedDosageFormNames.length > 0) {
+      return (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {acceptedDosageFormNames.length} dosage form{acceptedDosageFormNames.length !== 1 ? "s" : ""} selected
+        </p>
       );
     }
 

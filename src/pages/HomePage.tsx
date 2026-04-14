@@ -14,8 +14,6 @@ const HomePage = () => {
       <TopBar />
       <HeroSection />
 
-      <CurrentSupplementsSection />
-
       <GoalsSection />
 
       <ProfileSection />
@@ -25,6 +23,8 @@ const HomePage = () => {
       <ApproachSection />
 
       <MatchesSection />
+
+      <CurrentSupplementsSection />
 
       <CartSection />
 

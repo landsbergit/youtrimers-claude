@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useRecommendationContext, SECTION_ORDER, SECTION_LABELS, type SectionKey } from "@/context/RecommendationContext";
+import { useRecommendationContext, SECTION_ORDER, PERSONALIZE_SECTION_ORDER, SECTION_LABELS, type SectionKey } from "@/context/RecommendationContext";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { ProductCard } from "@/components/matches/ProductCard";
@@ -37,6 +37,10 @@ export default function MatchesSection() {
     reproductiveStatus,
     birthYear,
     birthMonth,
+    religiousPreferences,
+    bodySize,
+    heightCm,
+    weightKg,
   } = useRecommendationContext();
   const hasAnySection = savedSections.size > 0;
 
@@ -49,6 +53,10 @@ export default function MatchesSection() {
     reproductiveStatus,
     birthYear,
     birthMonth,
+    religiousPreferences,
+    bodySize,
+    heightCm,
+    weightKg,
   });
 
   // Preload the catalog while the user browses (non-blocking)
@@ -92,7 +100,7 @@ export default function MatchesSection() {
     return diversifyResults(raw, lambda, raw.length);
   }, [result, lambda]);
 
-  const allSectionsSaved = SECTION_ORDER.every((s) => savedSections.has(s));
+  const allSectionsSaved = PERSONALIZE_SECTION_ORDER.every((s) => savedSections.has(s));
 
   return (
     <section id="matches" className="px-4 py-20 sm:px-6 lg:px-8">
@@ -299,7 +307,7 @@ function BundleSizeControl({
 
 function PersonalizationProgress({ savedSections }: { savedSections: Set<SectionKey> }) {
   const { selectedGoals, qualityWeight, acceptedDosageFormNames } = useRecommendationContext();
-  const savedCount = savedSections.size;
+  const savedCount = PERSONALIZE_SECTION_ORDER.filter((s) => savedSections.has(s)).length;
 
   function sectionSummary(s: SectionKey): React.ReactNode {
     if (!savedSections.has(s)) return null;
@@ -343,11 +351,11 @@ function PersonalizationProgress({ savedSections }: { savedSections: Set<Section
     <div className="mb-8 rounded-xl border border-border bg-card p-5">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm font-semibold text-foreground">Your Personalization</p>
-        <span className="text-xs text-muted-foreground">{savedCount} / {SECTION_ORDER.length} saved</span>
+        <span className="text-xs text-muted-foreground">{savedCount} / {PERSONALIZE_SECTION_ORDER.length} saved</span>
       </div>
 
-      <div className="space-y-3">
-        {SECTION_ORDER.map((s) => {
+      <div className="space-y-4">
+        {PERSONALIZE_SECTION_ORDER.map((s) => {
           const done = savedSections.has(s);
           const summary = sectionSummary(s);
           return (

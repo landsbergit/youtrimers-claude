@@ -10,6 +10,9 @@ import {
   type DosageFormGroup,
 } from "@/hooks/useDosageFormTree";
 import { useFoodPreferenceNodes } from "@/hooks/useFoodPreferenceNodes";
+import { useFoodRestrictionNodes } from "@/hooks/useFoodRestrictionNodes";
+import { useReligiousPreferenceNodes } from "@/hooks/useReligiousPreferenceNodes";
+import { useMemberReligiousPreferences } from "@/hooks/useMemberReligiousPreferences";
 
 const LS_FOOD_PREFS = "youtrimers_food_prefs";
 
@@ -175,11 +178,29 @@ export default function PreferencesSection() {
     setAcceptedDosageFormNames,
     dosageFormPreferencesSaved,
     setDosageFormPreferencesSaved,
+    setReligiousPreferences,
     saveSection,
   } = useRecommendationContext();
 
   const { data: tree, isLoading: loadingTree } = useDosageFormTree();
   const { data: foodNodes, isLoading: loadingFood } = useFoodPreferenceNodes();
+  const { data: restrictionNodes, isLoading: loadingRestrictions } = useFoodRestrictionNodes();
+  // Vegan & Vegetarian are displayed here (under Food & Source Preferences) not in Profile
+  const dietaryNodes = (restrictionNodes ?? []).filter((n) =>
+    ["vegan", "vegetarian"].includes(n.displayName.toLowerCase()),
+  );
+  const { data: religiousNodes, isLoading: loadingReligious } = useReligiousPreferenceNodes();
+  const {
+    preferences: religiousSelected,
+    togglePreference: toggleReligious,
+    savePreferences: saveReligiousPreferences,
+    saving: savingReligious,
+  } = useMemberReligiousPreferences();
+
+  // Keep context in sync whenever the hook's state changes (including Supabase load on login)
+  useEffect(() => {
+    setReligiousPreferences(religiousSelected.map((p) => p.nodeName));
+  }, [religiousSelected, setReligiousPreferences]);
 
   // Dosage form selection (persisted via context → localStorage)
   const [selected, setSelected] = useState<string[]>(acceptedDosageFormNames);
@@ -234,7 +255,7 @@ export default function PreferencesSection() {
     );
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selected.length === 0) {
       setSaveError("Please select at least one dosage form.");
       return;
@@ -243,6 +264,13 @@ export default function PreferencesSection() {
     setAcceptedDosageFormNames(selected);
     setDosageFormPreferencesSaved(true);
     localStorage.setItem(LS_FOOD_PREFS, JSON.stringify(selectedFood));
+
+    const { error } = await saveReligiousPreferences();
+    if (error) {
+      setSaveError("Failed to save religious preferences. Please try again.");
+      return;
+    }
+
     saveSection("preferences");
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -259,7 +287,7 @@ export default function PreferencesSection() {
     return `${years} yr ${rem} mo old`;
   })();
 
-  const isLoading = loadingTree || loadingFood;
+  const isLoading = loadingTree || loadingFood || loadingRestrictions || loadingReligious;
 
   return (
     <section id="preferences" className="px-4 py-20 sm:px-6 lg:px-8">
@@ -348,15 +376,13 @@ export default function PreferencesSection() {
               Filter for products labelled with these certifications or sourcing standards.
             </p>
 
-            {loadingFood ? (
+            {loadingFood || loadingRestrictions ? (
               <div className="space-y-2 animate-pulse">
                 {[1, 2, 3].map((i) => <div key={i} className="h-5 w-32 rounded bg-muted" />)}
               </div>
-            ) : !foodNodes || foodNodes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No options available.</p>
             ) : (
               <div className="space-y-2">
-                {foodNodes.map((node) => (
+                {[...dietaryNodes, ...(foodNodes ?? [])].map((node) => (
                   <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
                     <input
                       type="checkbox"
@@ -373,15 +399,49 @@ export default function PreferencesSection() {
             )}
           </div>
 
+          {/* ── Religious Preferences ── */}
+          <div>
+            <label className="block text-sm font-semibold text-foreground mb-1">
+              Religious &amp; Dietary Certifications
+            </label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Only show products carrying these certifications. Leave unchecked to see all products.
+            </p>
+
+            {loadingReligious ? (
+              <div className="space-y-2 animate-pulse">
+                {[1, 2].map((i) => <div key={i} className="h-5 w-28 rounded bg-muted" />)}
+              </div>
+            ) : !religiousNodes || religiousNodes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No options available.</p>
+            ) : (
+              <div className="space-y-2">
+                {religiousNodes.map((node) => (
+                  <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      checked={religiousSelected.some((p) => p.id === node.id)}
+                      onChange={() => toggleReligious({ id: node.id, nodeName: node.nodeName })}
+                      className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
+                    />
+                    <span className="text-sm text-foreground group-hover:text-foreground/80">
+                      {node.displayName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* ── Save button ── */}
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={handleSave}
-              disabled={isLoading}
+              disabled={isLoading || savingReligious}
               className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
             >
-              Save Preferences
+              {savingReligious ? "Saving…" : "Save Preferences"}
             </button>
 
             {saved && (

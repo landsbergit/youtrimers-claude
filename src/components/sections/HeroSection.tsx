@@ -1,8 +1,9 @@
 const HeroSection = () => {
   const handleCTA = () => {
-    const el = document.querySelector("#supplements");
+    const el = document.getElementById("goals");
     if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
+      const top = el.getBoundingClientRect().top + window.scrollY - 64;
+      window.scrollTo({ top, behavior: "smooth" });
     }
   };
 

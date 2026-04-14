@@ -45,6 +45,42 @@ export type Database = {
           },
         ];
       };
+      member_religious_preferences: {
+        Row: {
+          id: string;
+          member_id: string;
+          node_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          node_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          node_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_religious_preferences_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: false;
+            referencedRelation: "members";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "member_religious_preferences_node_id_fkey";
+            columns: ["node_id"];
+            isOneToOne: false;
+            referencedRelation: "ontology";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       member_health_conditions: {
         Row: {
           id: string;
@@ -149,6 +185,44 @@ export type Database = {
             columns: ["ontology_node_id"];
             isOneToOne: false;
             referencedRelation: "ontology";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      member_basic_profile: {
+        Row: {
+          id: string;
+          member_id: string;
+          body_size: "LOW" | "MEDIUM" | "HIGH" | null;
+          height_cm: number | null;
+          weight_kg: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          member_id: string;
+          body_size?: "LOW" | "MEDIUM" | "HIGH" | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          member_id?: string;
+          body_size?: "LOW" | "MEDIUM" | "HIGH" | null;
+          height_cm?: number | null;
+          weight_kg?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "member_basic_profile_member_id_fkey";
+            columns: ["member_id"];
+            isOneToOne: true;
+            referencedRelation: "members";
             referencedColumns: ["id"];
           },
         ];

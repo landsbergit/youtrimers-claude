@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, ArrowRight, Camera, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { CurrentSupplement } from "@/hooks/useMemberCurrentSupplements";
+import { BarcodeScanOverlay } from "./BarcodeScanOverlay";
 
 interface SearchResult {
   productId: number;
@@ -67,7 +68,7 @@ export function SupplementSearch({ alreadyAddedIds, onAdd }: SupplementSearchPro
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [showCameraHint, setShowCameraHint] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +119,16 @@ export function SupplementSearch({ alreadyAddedIds, onAdd }: SupplementSearchPro
     setActiveIndex(-1);
     inputRef.current?.focus();
   };
+
+  // When a barcode is scanned on mobile, inject it as the query and run search immediately
+  const handleBarcodeResult = useCallback((barcode: string) => {
+    setShowScanner(false);
+    setQuery(barcode);
+    setActiveIndex(-1);
+    clearTimeout(debounceRef.current);
+    search(barcode);
+    inputRef.current?.focus();
+  }, [search]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -184,32 +195,15 @@ export function SupplementSearch({ alreadyAddedIds, onAdd }: SupplementSearchPro
           </button>
         )}
 
-        {/* Camera (barcode stub) */}
-        <div className="relative flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => { setShowCameraHint((v) => !v); inputRef.current?.focus(); }}
-            className="flex items-center justify-center h-7 w-7 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            aria-label="Scan barcode"
-          >
-            <Camera size={14} />
-          </button>
-          {showCameraHint && (
-            <div className="absolute right-0 top-full mt-2 z-50 w-60 rounded-lg border border-border bg-popover shadow-lg px-3 py-2.5 text-xs text-muted-foreground">
-              <div className="flex items-start justify-between gap-2">
-                <span>Barcode scanning coming soon. Type or paste a UPC code (8–14 digits) to search by barcode.</span>
-                <button
-                  type="button"
-                  onClick={() => setShowCameraHint(false)}
-                  aria-label="Close"
-                  className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
-                >
-                  <X size={12} strokeWidth={2.5} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Camera — opens QR-code modal on desktop, live scanner on mobile */}
+        <button
+          type="button"
+          onClick={() => setShowScanner(true)}
+          className="flex items-center justify-center h-7 w-7 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+          aria-label="Scan barcode"
+        >
+          <Camera size={14} />
+        </button>
 
         {/* Go arrow */}
         <button
@@ -288,6 +282,14 @@ export function SupplementSearch({ alreadyAddedIds, onAdd }: SupplementSearchPro
         <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-popover shadow-lg px-3 py-3 text-sm text-muted-foreground">
           No products found for "{query}"
         </div>
+      )}
+
+      {/* Barcode scanner overlay (portal-less — rendered above all siblings via fixed positioning) */}
+      {showScanner && (
+        <BarcodeScanOverlay
+          onResult={handleBarcodeResult}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );

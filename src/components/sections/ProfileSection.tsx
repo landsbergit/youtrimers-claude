@@ -11,6 +11,7 @@ import { useFoodRestrictionNodes } from "@/hooks/useFoodRestrictionNodes";
 import { useReproductiveStatusNodes } from "@/hooks/useReproductiveStatusNodes";
 import { useRecommendationContext } from "@/context/RecommendationContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useMemberBasicProfile } from "@/hooks/useMemberBasicProfile";
 import { supabase } from "@/lib/supabase";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -25,13 +26,13 @@ const LS_GENDER              = "youtrimers_gender";
 const LS_REPRODUCTIVE_STATUS = "youtrimers_reproductive_status";
 const LS_FOOD_RESTRICTIONS   = "youtrimers_food_restrictions";
 
-// Gender options: 3 from ontology + UI-only "prefer not to say"
+// Gender options. hidden: true = valid data value but not shown in the UI.
 const GENDER_OPTIONS = [
-  { nodeName: "FEMALE",            displayName: "Female" },
-  { nodeName: "MALE",              displayName: "Male" },
-  { nodeName: "OTHER",             displayName: "Other" },
-  { nodeName: "PREFER_NOT_TO_SAY", displayName: "Prefer not to say" },
-] as const;
+  { nodeName: "FEMALE",            displayName: "Female",           hidden: false },
+  { nodeName: "MALE",              displayName: "Male",             hidden: false },
+  { nodeName: "OTHER",             displayName: "Other",            hidden: true  },
+  { nodeName: "PREFER_NOT_TO_SAY", displayName: "Prefer not to say", hidden: true },
+];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -44,9 +45,18 @@ export default function ProfileSection() {
     setBirthMonth: setContextBirthMonth,
     birthYear: contextBirthYear,
     birthMonth: contextBirthMonth,
+    bodySize: contextBodySize,
+    setBodySize: setContextBodySize,
+    heightCm: contextHeightCm,
+    setHeightCm: setContextHeightCm,
+    weightKg: contextWeightKg,
+    setWeightKg: setContextWeightKg,
+    useImperial: contextUseImperial,
+    setUseImperial: setContextUseImperial,
   } = useRecommendationContext();
 
   const { user } = useAuth();
+  const { saveBasicProfile, saving: savingBasicProfile } = useMemberBasicProfile();
   const { data: allMedications, isLoading: loadingMeds } = useMedicationNodes();
   const { medications, addMedication, removeMedication, saveMedications, saving } =
     useMemberMedications();
@@ -86,7 +96,32 @@ export default function ProfileSection() {
     try { return JSON.parse(localStorage.getItem(LS_FOOD_RESTRICTIONS) ?? "[]"); }
     catch { return []; }
   });
-  const [restrictionsOpen, setRestrictionsOpen] = useState(false);
+
+  // Body size / measurements state
+  const [bodySizeLocal, setBodySizeLocal] = useState<string>(contextBodySize ?? "");
+  const [precisionOpen, setPrecisionOpen] = useState<boolean>(
+    () => contextHeightCm != null || contextWeightKg != null,
+  );
+  const [useImperialLocal, setUseImperialLocal] = useState<boolean>(contextUseImperial);
+  const [heightCmInput, setHeightCmInput] = useState<string>(
+    contextHeightCm != null ? String(contextHeightCm) : "",
+  );
+  const [weightKgInput, setWeightKgInput] = useState<string>(
+    contextWeightKg != null ? String(contextWeightKg) : "",
+  );
+  const [heightFtInput, setHeightFtInput] = useState<string>(() => {
+    if (contextHeightCm == null) return "";
+    return String(Math.floor(contextHeightCm / 30.48));
+  });
+  const [heightInInput, setHeightInInput] = useState<string>(() => {
+    if (contextHeightCm == null) return "";
+    const totalIn = contextHeightCm / 2.54;
+    return String(Math.round(totalIn % 12));
+  });
+  const [weightLbsInput, setWeightLbsInput] = useState<string>(() => {
+    if (contextWeightKg == null) return "";
+    return String(Math.round((contextWeightKg / 0.453592) * 10) / 10);
+  });
 
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -114,12 +149,81 @@ export default function ProfileSection() {
     })();
   }, [user, setContextBirthYear, setContextBirthMonth]);
 
+  // Load basic profile from Supabase on login
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data: member } = await supabase
+        .from("members")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("is_primary", true)
+        .maybeSingle();
+      if (!member) return;
+
+      const { data: bp } = await supabase
+        .from("member_basic_profile")
+        .select("body_size, height_cm, weight_kg")
+        .eq("member_id", member.id)
+        .maybeSingle();
+
+      if (bp) {
+        const bs = (bp.body_size as "LOW" | "MEDIUM" | "HIGH") ?? null;
+        setBodySizeLocal(bs ?? "");
+        setContextBodySize(bs);
+
+        if (bp.height_cm != null) {
+          const cm = Number(bp.height_cm);
+          setHeightCmInput(String(cm));
+          setContextHeightCm(cm);
+          setHeightFtInput(String(Math.floor(cm / 30.48)));
+          setHeightInInput(String(Math.round((cm / 2.54) % 12)));
+          setPrecisionOpen(true);
+        }
+        if (bp.weight_kg != null) {
+          const kg = Number(bp.weight_kg);
+          setWeightKgInput(String(kg));
+          setContextWeightKg(kg);
+          setWeightLbsInput(String(Math.round((kg / 0.453592) * 10) / 10));
+          setPrecisionOpen(true);
+        }
+      }
+    })();
+  }, [user, setContextBodySize, setContextHeightCm, setContextWeightKg]);
+
   // Clear reproductive status when gender changes away from Female
   useEffect(() => {
     if (selectedGender !== "FEMALE") {
       setSelectedReproductiveStatus("");
     }
   }, [selectedGender]);
+
+  // Convert displayed values when switching between metric and imperial
+  const handleUnitToggle = (toImperial: boolean) => {
+    if (toImperial) {
+      const cm = parseFloat(heightCmInput);
+      if (!isNaN(cm) && cm > 0) {
+        const totalIn = cm / 2.54;
+        setHeightFtInput(String(Math.floor(totalIn / 12)));
+        setHeightInInput(String(Math.round(totalIn % 12)));
+      }
+      const kg = parseFloat(weightKgInput);
+      if (!isNaN(kg) && kg > 0) {
+        setWeightLbsInput(String(Math.round((kg / 0.453592) * 10) / 10));
+      }
+    } else {
+      const ft = parseFloat(heightFtInput) || 0;
+      const inches = parseFloat(heightInInput) || 0;
+      const cm = ft * 30.48 + inches * 2.54;
+      if (cm > 0) setHeightCmInput(String(Math.round(cm)));
+      const lbs = parseFloat(weightLbsInput);
+      if (!isNaN(lbs) && lbs > 0) {
+        setWeightKgInput(String(Math.round(lbs * 0.453592 * 10) / 10));
+      }
+    }
+    setUseImperialLocal(toImperial);
+    setContextUseImperial(toImperial);
+  };
 
   const toggleRestriction = (nodeName: string) => {
     setSelectedRestrictions((prev) =>
@@ -158,6 +262,26 @@ export default function ProfileSection() {
     const { error: condError } = await saveConditions();
     if (condError) { setSaveError(condError.message); return; }
 
+    // Compute metric body measurements from active unit mode
+    let finalHeightCm: number | null = null;
+    let finalWeightKg: number | null = null;
+    if (precisionOpen) {
+      if (useImperialLocal) {
+        const ft = parseFloat(heightFtInput) || 0;
+        const inches = parseFloat(heightInInput) || 0;
+        const cm = Math.round(ft * 30.48 + inches * 2.54);
+        finalHeightCm = cm > 0 ? cm : null;
+        const lbs = parseFloat(weightLbsInput);
+        finalWeightKg = !isNaN(lbs) && lbs > 0 ? Math.round(lbs * 0.453592 * 10) / 10 : null;
+      } else {
+        const cm = parseFloat(heightCmInput);
+        finalHeightCm = !isNaN(cm) && cm > 0 ? Math.round(cm) : null;
+        const kg = parseFloat(weightKgInput);
+        finalWeightKg = !isNaN(kg) && kg > 0 ? Math.round(kg * 10) / 10 : null;
+      }
+    }
+    const finalBodySize = (bodySizeLocal as "LOW" | "MEDIUM" | "HIGH") || null;
+
     // Sync profile fields to context (also persists to localStorage)
     setContextGender(selectedGender || null);
     setContextReproductiveStatus(
@@ -167,6 +291,9 @@ export default function ProfileSection() {
     );
     setContextBirthYear(parsedYear);
     setContextBirthMonth(parsedMonth);
+    setContextBodySize(finalBodySize);
+    setContextHeightCm(finalHeightCm);
+    setContextWeightKg(finalWeightKg);
 
     // Save birth date to Supabase for logged-in users
     if (user) {
@@ -185,6 +312,10 @@ export default function ProfileSection() {
       }
     }
 
+    // Save basic profile (body size / measurements) to Supabase
+    const { error: bpError } = await saveBasicProfile(finalBodySize, finalHeightCm, finalWeightKg);
+    if (bpError) { setSaveError(bpError.message); return; }
+
     saveSection("profile");
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -193,205 +324,329 @@ export default function ProfileSection() {
   const isFemale = selectedGender === "FEMALE";
 
   return (
-    <section id="profile" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="profile" className="px-4 pt-6 pb-20 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <h2 className="font-heading text-foreground text-3xl mb-1">Profile</h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Tell us about yourself so we can personalise your supplement recommendations.
-        </p>
+        <div className="flex items-center gap-4 mb-8 flex-wrap">
+          <h2 className="font-heading text-foreground text-3xl flex-shrink-0">Profile</h2>
+          <p className="text-muted-foreground text-base">
+            Share a bit about yourself to get personalized supplements.
+          </p>
+        </div>
 
-        <div className="max-w-xl space-y-8">
+        <div className="space-y-8">
 
-          {/* ── Gender ── */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-3">
-              Gender
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {GENDER_OPTIONS.map((opt) => {
-                const isSelected = selectedGender === opt.nodeName;
-                return (
-                  <button
-                    key={opt.nodeName}
-                    type="button"
-                    onClick={() => setSelectedGender(isSelected ? "" : opt.nodeName)}
-                    className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                    }`}
-                  >
-                    {opt.displayName}
-                  </button>
-                );
-              })}
+          {/* ── Gender + Age (same row) ── */}
+          <div className="flex items-center gap-6 flex-wrap">
+
+            {/* Gender */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-foreground flex-shrink-0">Gender</span>
+              <div className="flex flex-wrap gap-2">
+                {GENDER_OPTIONS.filter((opt) => !opt.hidden).map((opt) => {
+                  const isSelected = selectedGender === opt.nodeName;
+                  return (
+                    <button
+                      key={opt.nodeName}
+                      type="button"
+                      onClick={() => setSelectedGender(isSelected ? "" : opt.nodeName)}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                        isSelected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >
+                      {opt.displayName}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            {/* Age */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-foreground flex-shrink-0">Age</span>
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-muted-foreground">Year of birth</label>
+                  <input
+                    type="number"
+                    min={1900}
+                    max={CURRENT_YEAR}
+                    value={birthYear}
+                    onChange={(e) => setBirthYear(e.target.value)}
+                    placeholder="YYYY"
+                    className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-muted-foreground">Month of birth</label>
+                  <select
+                    value={birthMonth}
+                    onChange={(e) => setBirthMonth(e.target.value)}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                  >
+                    <option value="">Month</option>
+                    {MONTHS.map((name, i) => (
+                      <option key={i + 1} value={i + 1}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          {/* ── Reproductive Health (female only) ── */}
+          {/* ── Reproductive status (female only) ── */}
           {isFemale && (
-            <div>
-              <label className="block text-sm font-semibold text-foreground mb-1">
-                Reproductive Health
-              </label>
-              <p className="text-xs text-muted-foreground mb-3">
-                Helps us tailor nutrient recommendations to your current life stage.
-              </p>
+            <div className="overflow-x-auto scrollbar-hide">
               {loadingReproductive ? (
-                <div className="space-y-2 animate-pulse">
-                  {[1, 2, 3].map((i) => <div key={i} className="h-5 w-36 rounded bg-muted" />)}
+                <div className="flex gap-2 animate-pulse">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="h-8 w-24 rounded-full bg-muted" />)}
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {/* None / not applicable option */}
-                  <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-                    <input
-                      type="radio"
-                      name="reproductive_status"
-                      value=""
-                      checked={selectedReproductiveStatus === ""}
-                      onChange={() => setSelectedReproductiveStatus("")}
-                      className="h-4 w-4 accent-primary cursor-pointer"
-                    />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground">
-                      None / Not applicable
-                    </span>
-                  </label>
-                  {(reproductiveNodes ?? []).map((node) => (
-                    <label
-                      key={node.id}
-                      className="flex items-center gap-2.5 cursor-pointer select-none group"
+                <div className="flex items-center gap-3 min-w-max">
+                  <span className="text-sm font-semibold text-foreground">
+                    Reproductive status
+                  </span>
+                  <div className="flex gap-2">
+                    {[...(reproductiveNodes ?? [])]
+                      .sort((a, b) => {
+                        const ORDER = ["PRENATAL", "PREGNANCY", "BREASTFEEDING", "PREMENOPAUSAL", "MENOPAUSAL", "POSTMENOPAUSAL"];
+                        const ai = ORDER.indexOf(a.nodeName);
+                        const bi = ORDER.indexOf(b.nodeName);
+                        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                      })
+                      .map((node) => {
+                        const isSelected = selectedReproductiveStatus === node.nodeName;
+                        return (
+                          <button
+                            key={node.id}
+                            type="button"
+                            onClick={() => setSelectedReproductiveStatus(isSelected ? "" : node.nodeName)}
+                            className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                              isSelected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                            }`}
+                          >
+                            {node.displayName}
+                          </button>
+                        );
+                      })}
+                    {/* None — last, selected by default */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedReproductiveStatus("")}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                        selectedReproductiveStatus === ""
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="reproductive_status"
-                        value={node.nodeName}
-                        checked={selectedReproductiveStatus === node.nodeName}
-                        onChange={() => setSelectedReproductiveStatus(node.nodeName)}
-                        className="h-4 w-4 accent-primary cursor-pointer"
-                      />
-                      <span className="text-sm text-foreground group-hover:text-foreground/80">
-                        {node.displayName}
-                      </span>
-                    </label>
-                  ))}
+                      None
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Age ── */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-1">Age</label>
-            <p className="text-xs text-muted-foreground mb-3">
-              Used to suggest age-appropriate dosage forms for your preferences.
-            </p>
-            <div className="flex gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Year of birth</label>
-                <input
-                  type="number"
-                  min={1900}
-                  max={CURRENT_YEAR}
-                  value={birthYear}
-                  onChange={(e) => setBirthYear(e.target.value)}
-                  placeholder="YYYY"
-                  className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Month of birth</label>
-                <select
-                  value={birthMonth}
-                  onChange={(e) => setBirthMonth(e.target.value)}
-                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                >
-                  <option value="">Month</option>
-                  {MONTHS.map((name, i) => (
-                    <option key={i + 1} value={i + 1}>{name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
+          {/* ── Food restrictions + Physical size (same row) ── */}
+          <div className="flex items-start gap-10 flex-wrap">
 
-          {/* ── Food Restrictions (collapsible) ── */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setRestrictionsOpen((v) => !v)}
-              className="flex w-full items-center justify-between gap-2 text-left group"
-            >
-              <div>
-                <span className="block text-sm font-semibold text-foreground">
-                  Food Restrictions
-                </span>
-                {!restrictionsOpen && selectedRestrictions.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {selectedRestrictions.map((nodeName) => {
-                      const label =
-                        restrictionNodes?.find((n) => n.nodeName === nodeName)?.displayName ??
-                        nodeName;
+            {/* Food restrictions */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-semibold text-foreground flex-shrink-0">Food restrictions</span>
+                <p className="text-xs text-muted-foreground">
+                  Products are screened for these labels, but always check before ordering and using to ensure safety.
+                </p>
+              </div>
+              {loadingRestrictions ? (
+                <div className="flex gap-2 animate-pulse">
+                  {[1, 2, 3].map((i) => <div key={i} className="h-8 w-16 rounded-full bg-muted" />)}
+                </div>
+              ) : (
+                <div className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-hide">
+                  {(restrictionNodes ?? [])
+                    .filter((n) => !["vegan", "vegetarian"].includes(n.displayName.toLowerCase()))
+                    .map((node) => {
+                      const isSelected = selectedRestrictions.includes(node.nodeName);
+                      const label = node.displayName.replace(/\s*Free$/i, "");
                       return (
-                        <span
-                          key={nodeName}
-                          className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 pl-2 pr-1 py-0.5 text-xs font-medium text-primary"
+                        <button
+                          key={node.id}
+                          type="button"
+                          onClick={() => toggleRestriction(node.nodeName)}
+                          className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                            isSelected
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                          }`}
                         >
                           {label}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); toggleRestriction(nodeName); }}
-                            aria-label={`Remove ${label}`}
-                            className="rounded-full p-0.5 hover:bg-primary/20 transition-colors"
-                          >
-                            <X size={10} strokeWidth={2.5} />
-                          </button>
-                        </span>
+                        </button>
                       );
                     })}
-                  </div>
-                )}
-                {!restrictionsOpen && selectedRestrictions.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-0.5">None selected</p>
-                )}
-              </div>
-              <span className="flex-shrink-0 text-muted-foreground group-hover:text-foreground transition-colors">
-                {restrictionsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              </span>
-            </button>
+                </div>
+              )}
+            </div>
 
-            {restrictionsOpen && (
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground mb-3">
-                  Select any dietary restrictions or lifestyle choices. We use these to
-                  flag products that may not be suitable for you.
+            {/* Physical size */}
+            <div>
+              <div className="flex items-center gap-3 flex-wrap mb-3">
+                <span className="text-sm font-semibold text-foreground flex-shrink-0">Physical size</span>
+                <p className="text-xs text-muted-foreground">
+                  Helps us estimate appropriate nutrient dosages for your body.
                 </p>
-                {loadingRestrictions ? (
-                  <div className="space-y-2 animate-pulse">
-                    {[1, 2, 3].map((i) => <div key={i} className="h-5 w-32 rounded bg-muted" />)}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                    {(restrictionNodes ?? []).map((node) => (
-                      <label
-                        key={node.id}
-                        className="flex items-center gap-2 cursor-pointer select-none group"
+              </div>
+
+              {!precisionOpen ? (
+                /* ── Simple 3-state mode ── */
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex gap-2">
+                    {(["LOW", "MEDIUM", "HIGH"] as const).map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => setBodySizeLocal(bodySizeLocal === size ? "" : size)}
+                        className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                          bodySizeLocal === size
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                        }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={selectedRestrictions.includes(node.nodeName)}
-                          onChange={() => toggleRestriction(node.nodeName)}
-                          className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
-                        />
-                        <span className="text-sm text-foreground group-hover:text-foreground/80">
-                          {node.displayName}
-                        </span>
-                      </label>
+                        {size === "LOW" ? "Small" : size === "MEDIUM" ? "Medium" : "Large"}
+                      </button>
                     ))}
                   </div>
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => setPrecisionOpen(true)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+                  >
+                    More precision
+                  </button>
+                </div>
+              ) : (
+                /* ── Precision mode ── */
+                <div className="space-y-4">
+                  {/* Metric / Imperial toggle */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Units:</span>
+                    <div className="flex rounded-lg border border-border overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleUnitToggle(false)}
+                        className={`px-3 py-1 text-xs font-medium transition-colors border-r border-border ${
+                          !useImperialLocal
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Metric
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUnitToggle(true)}
+                        className={`px-3 py-1 text-xs font-medium transition-colors ${
+                          useImperialLocal
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Imperial
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Height */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground">Height</label>
+                    {!useImperialLocal ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={50}
+                          max={280}
+                          value={heightCmInput}
+                          onChange={(e) => setHeightCmInput(e.target.value)}
+                          placeholder="e.g. 170"
+                          className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-sm text-muted-foreground">cm</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={1}
+                          max={9}
+                          value={heightFtInput}
+                          onChange={(e) => setHeightFtInput(e.target.value)}
+                          placeholder="ft"
+                          className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-sm text-muted-foreground">ft</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={11}
+                          value={heightInInput}
+                          onChange={(e) => setHeightInInput(e.target.value)}
+                          placeholder="in"
+                          className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-sm text-muted-foreground">in</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Weight */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-muted-foreground">Weight</label>
+                    <div className="flex items-center gap-2">
+                      {!useImperialLocal ? (
+                        <>
+                          <input
+                            type="number"
+                            min={20}
+                            max={500}
+                            value={weightKgInput}
+                            onChange={(e) => setWeightKgInput(e.target.value)}
+                            placeholder="e.g. 70"
+                            className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                          />
+                          <span className="text-sm text-muted-foreground">kg</span>
+                        </>
+                      ) : (
+                        <>
+                          <input
+                            type="number"
+                            min={44}
+                            max={1100}
+                            value={weightLbsInput}
+                            onChange={(e) => setWeightLbsInput(e.target.value)}
+                            placeholder="e.g. 155"
+                            className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                          />
+                          <span className="text-sm text-muted-foreground">lbs</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setPrecisionOpen(false)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+                  >
+                    Less precision
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
 
           {/* ── Medications ── */}
@@ -462,15 +717,170 @@ export default function ProfileSection() {
             )}
           </div>
 
+          {/* ── Physical size / Measurements ── */}
+          <div>
+            <div className="flex items-center gap-3 flex-wrap mb-3">
+              <span className="text-sm font-semibold text-foreground flex-shrink-0">Physical size</span>
+              <p className="text-xs text-muted-foreground">
+                Helps us estimate appropriate nutrient dosages for your body.
+              </p>
+            </div>
+
+            {!precisionOpen ? (
+              /* ── Simple 3-state mode ── */
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex gap-2">
+                  {(["LOW", "MEDIUM", "HIGH"] as const).map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setBodySizeLocal(bodySizeLocal === size ? "" : size)}
+                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                        bodySizeLocal === size
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                      }`}
+                    >
+                      {size === "LOW" ? "Small" : size === "MEDIUM" ? "Medium" : "Large"}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPrecisionOpen(true)}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+                >
+                  More precision
+                </button>
+              </div>
+            ) : (
+              /* ── Precision mode ── */
+              <div className="space-y-4">
+                {/* Metric / Imperial toggle */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Units:</span>
+                  <div className="flex rounded-lg border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => handleUnitToggle(false)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors border-r border-border ${
+                        !useImperialLocal
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      Metric
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitToggle(true)}
+                      className={`px-3 py-1 text-xs font-medium transition-colors ${
+                        useImperialLocal
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      Imperial
+                    </button>
+                  </div>
+                </div>
+
+                {/* Height */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-muted-foreground">Height</label>
+                  {!useImperialLocal ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={50}
+                        max={280}
+                        value={heightCmInput}
+                        onChange={(e) => setHeightCmInput(e.target.value)}
+                        placeholder="e.g. 170"
+                        className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                      />
+                      <span className="text-sm text-muted-foreground">cm</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={1}
+                        max={9}
+                        value={heightFtInput}
+                        onChange={(e) => setHeightFtInput(e.target.value)}
+                        placeholder="ft"
+                        className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                      />
+                      <span className="text-sm text-muted-foreground">ft</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={11}
+                        value={heightInInput}
+                        onChange={(e) => setHeightInInput(e.target.value)}
+                        placeholder="in"
+                        className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                      />
+                      <span className="text-sm text-muted-foreground">in</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Weight */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-muted-foreground">Weight</label>
+                  <div className="flex items-center gap-2">
+                    {!useImperialLocal ? (
+                      <>
+                        <input
+                          type="number"
+                          min={20}
+                          max={500}
+                          value={weightKgInput}
+                          onChange={(e) => setWeightKgInput(e.target.value)}
+                          placeholder="e.g. 70"
+                          className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-sm text-muted-foreground">kg</span>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min={44}
+                          max={1100}
+                          value={weightLbsInput}
+                          onChange={(e) => setWeightLbsInput(e.target.value)}
+                          placeholder="e.g. 155"
+                          className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-sm text-muted-foreground">lbs</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPrecisionOpen(false)}
+                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+                >
+                  Less precision
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* ── Save button ── */}
           <div className="flex items-center gap-3 pt-2">
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || savingBasicProfile}
               className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
             >
-              {saving ? "Saving…" : "Save Profile"}
+              {saving || savingBasicProfile ? "Saving…" : "Save Profile"}
             </button>
 
             {saved && (

@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { groupRpcRowsIntoFiredRules, consolidateRules } from "@/lib/engine/consolidateRules";
 import { scoreProducts } from "@/lib/engine/scoreProducts";
 import { applyDemographicFilter } from "@/lib/engine/applyDemographicFilter";
+import { applyReligiousFilter } from "@/lib/engine/applyReligiousFilter";
 import { useProductCatalog } from "./useProductCatalog";
 import type { MemberProfile, RankedProduct, ConsolidatedRules } from "@/types/engine";
 
@@ -41,6 +42,11 @@ export function useRecommendations(profile: MemberProfile) {
       profile.reproductiveStatus ?? "",
       profile.birthYear ?? "",
       profile.birthMonth ?? "",
+      [...profile.religiousPreferences].sort().join(","),
+      // body measurements — future engine use; included so any change auto-reruns
+      profile.bodySize ?? "",
+      profile.heightCm ?? "",
+      profile.weightKg ?? "",
     ],
     staleTime: STALE_TIME,
     enabled: goalIds.length > 0 && catalog != null,
@@ -86,13 +92,19 @@ export function useRecommendations(profile: MemberProfile) {
         profile.birthMonth,
       );
 
-      // 5. Apply dosage form pre-filter when preferences have been set
-      let scoringCatalog = demographicCatalog;
+      // 5a. Apply religious certification hard-exclusion filter
+      const religiousCatalog = applyReligiousFilter(
+        demographicCatalog,
+        profile.religiousPreferences,
+      );
+
+      // 5b. Apply dosage form pre-filter when preferences have been set
+      let scoringCatalog = religiousCatalog;
       let dosageFormFallback = false;
 
       if (profile.acceptedDosageFormNames.length > 0) {
         const acceptedSet = new Set(profile.acceptedDosageFormNames);
-        const filtered = demographicCatalog.filter(
+        const filtered = religiousCatalog.filter(
           (p) => p.normalizedDosageForm === null || acceptedSet.has(p.normalizedDosageForm),
         );
         if (filtered.length > 0) {

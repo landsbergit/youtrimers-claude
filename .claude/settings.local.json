@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command 'Get-PSDrive C | Select-Object Used,Free | ForEach-Object { [PSCustomObject]@{UsedGB=[math]::Round\\($_.Used/1GB,1\\); FreeGB=[math]::Round\\($_.Free/1GB,1\\)} }')",
+      "Bash(powershell -Command \"\\(Get-ChildItem 'C:\\\\Users\\\\User\\\\dataPrep_iHerb\\\\iHerb_pages' -Recurse | Measure-Object -Property Length -Sum\\).Sum / 1MB\")",
+      "Bash(powershell -Command \"\\(Get-ChildItem 'C:\\\\Users\\\\User\\\\dataPrep_iHerb\\\\iHerb_images' -Recurse | Measure-Object -Property Length -Sum\\).Sum / 1MB\")",
+      "Read(//c/Users/User/Documents/NUTRIMERS_2026/iHerb_ProuctData/**)",
+      "Bash(npx tsc:*)",
+      "Bash(echo \"exit: $?\")"
+    ]
+  }
+}

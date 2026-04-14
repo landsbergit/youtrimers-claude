@@ -1,26 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-const REPRODUCTIVE_STATUS_ROOT_ID = "3d01927d-0451-42c8-b773-3540a54994e1";
+// UUID of the RELIGION_PERMISSIONS node (child of TAGS root, seeded in 004_ontology_seed.sql)
+const RELIGION_PERMISSIONS_ROOT_ID = "b0e7cbf3-e0ab-4657-9676-40240692e5c2";
 
-export interface ReproductiveStatusNode {
+export interface ReligiousPreferenceNode {
   id: string;
-  nodeName: string;
-  displayName: string;
+  nodeName: string;    // e.g. "KOSHER" — matches product normalizedTags
+  displayName: string; // e.g. "Kosher"
 }
 
 /**
- * Fetches all leaf nodes under the REPRODUCTIVE_STATUS ontology node.
- * Intended order: Prenatal, Pregnancy, Breastfeeding, Premenopausal, Menopausal, Postmenopausal, None.
- * Display names from the ontology are lowercase; the UI capitalises them.
+ * Fetches all leaf nodes under the RELIGION_PERMISSIONS ontology node.
+ * Currently: KOSHER, HALAL.
+ * Used to populate checkboxes in PreferencesSection.
  */
-export function useReproductiveStatusNodes() {
-  return useQuery<ReproductiveStatusNode[]>({
-    queryKey: ["reproductiveStatusNodes"],
+export function useReligiousPreferenceNodes() {
+  return useQuery<ReligiousPreferenceNode[]>({
+    queryKey: ["religiousPreferenceNodes"],
     staleTime: 60 * 60 * 1000,
-    queryFn: async (): Promise<ReproductiveStatusNode[]> => {
+    queryFn: async (): Promise<ReligiousPreferenceNode[]> => {
       const { data: pairs, error: e1 } = await supabase.rpc("get_nutrient_descendants", {
-        p_node_ids: [REPRODUCTIVE_STATUS_ROOT_ID],
+        p_node_ids: [RELIGION_PERMISSIONS_ROOT_ID],
       });
       if (e1) throw new Error(e1.message);
 
@@ -28,7 +29,7 @@ export function useReproductiveStatusNodes() {
         ...new Set(
           (pairs ?? [])
             .map((r: { descendant_id: string }) => r.descendant_id)
-            .filter((id: string) => id !== REPRODUCTIVE_STATUS_ROOT_ID),
+            .filter((id: string) => id !== RELIGION_PERMISSIONS_ROOT_ID),
         ),
       ] as string[];
 
@@ -48,9 +49,7 @@ export function useReproductiveStatusNodes() {
         .map((n) => ({
           id: n.id,
           nodeName: n.node_name ?? n.id,
-          // Capitalise the first letter of each word
-          displayName: (n.display_name ?? n.node_name ?? n.id)
-            .replace(/\b\w/g, (c: string) => c.toUpperCase()),
+          displayName: n.display_name ?? n.node_name ?? n.id,
         }))
         .sort((a, b) => a.displayName.localeCompare(b.displayName));
     },

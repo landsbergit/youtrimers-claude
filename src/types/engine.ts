@@ -31,6 +31,9 @@ export interface MemberProfile {
   // ── Section 3: Preferences ────────────────────────────────────────────────
   /** Leaf-level node_names of accepted dosage forms. Empty = no filter. */
   acceptedDosageFormNames: string[];
+  /** node_names of selected religious certifications (e.g. "KOSHER", "HALAL").
+   *  Empty = no filter. Non-empty = products must carry ALL selected tags. */
+  religiousPreferences: string[];
 
   // ── Approach ──────────────────────────────────────────────────────────────
   qualityWeight: number; // 0 = rank by price, 1 = rank by match quality, default 0.5
@@ -41,6 +44,14 @@ export interface MemberProfile {
   // future: healthConditionIds?: string[];   // ontology node UUIDs
   // future: medicationIds?: string[];        // ontology node UUIDs
   // future: currentSupplementIds?: number[]; // product IDs
+
+  // ── Section 2: Profile — Body Size / Measurements ─────────────────────────
+  /** Categorical body size shortcut. Collected now; engine use is future. */
+  bodySize: "LOW" | "MEDIUM" | "HIGH" | null;
+  /** Height in cm (always metric). Collected now; engine use is future. */
+  heightCm: number | null;
+  /** Weight in kg (always metric). Collected now; engine use is future. */
+  weightKg: number | null;
 }
 
 // ── Rule data (from DB via RPC) ────────────────────────────────────────────────

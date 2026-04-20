@@ -58,6 +58,30 @@ function CategoryCheckbox({
   );
 }
 
+const DOSAGE_FORM_DESCRIPTIONS: Record<string, string> = {
+  CAPSULE: "Hard shell containing powder or granules — easy to swallow",
+  SOFTGEL: "Soft gelatin shell with liquid fill — often used for oils and fat-soluble vitamins",
+  TABLET: "Compressed solid form — may be scored for splitting",
+  CAPLET: "Oval-shaped tablet with a smooth coating — easier to swallow than round tablets",
+  CHEWABLE: "Flavored tablet you chew before swallowing — good for those who dislike swallowing pills",
+  GUMMY: "Soft, candy-like chewable — popular for vitamins and minerals",
+  LOZENGE: "Dissolves slowly in the mouth — often used for throat or immune support",
+  WAFER: "Thin, flat dissolvable form — melts on the tongue",
+  POWDER: "Loose powder to mix into water, smoothies, or food",
+  LIQUID: "Ready-to-take liquid — absorbed quickly, easy to dose for children",
+  SPRAY: "Fine mist sprayed into the mouth — fast absorption through oral tissue",
+  TEA_BAG: "Herbal tea bag steeped in hot water",
+  STRIP: "Thin film that dissolves on the tongue",
+  BAR: "Nutrition bar or chew bar — a food-like supplement form",
+  NUGGETS: "Small chewable nuggets — similar to gummies but firmer",
+  PELLET: "Tiny pellets or beads — sometimes placed under the tongue",
+  PACK: "Pre-portioned packet of powder or liquid",
+  CREAM: "Topical cream applied to the skin",
+  PATCH: "Adhesive patch worn on the skin for slow nutrient release",
+  OIL: "Liquid oil taken by mouth or added to food",
+  DROP: "Concentrated liquid drops — easy to dose precisely",
+};
+
 function LeafCheckbox({
   leaf,
   selectedSet,
@@ -67,8 +91,9 @@ function LeafCheckbox({
   selectedSet: Set<string>;
   onToggle: (nodeName: string) => void;
 }) {
+  const description = DOSAGE_FORM_DESCRIPTIONS[leaf.nodeName] ?? "";
   return (
-    <label className="flex items-center gap-2 cursor-pointer select-none group">
+    <label className="flex items-center gap-2 cursor-pointer select-none group" title={description}>
       <input
         type="checkbox"
         checked={selectedSet.has(leaf.nodeName)}
@@ -286,23 +311,14 @@ export default function PreferencesSection() {
   })();
 
   return (
-    <section id="preferences" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <div id="preferences">
         <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <h2 className="font-heading text-foreground text-3xl mb-3 cursor-default w-fit">
-              Preferences
-            </h2>
-          </TooltipTrigger>
-          <TooltipContent><p>Choose which supplement forms you can or prefer to take.</p></TooltipContent>
-        </Tooltip>
 
-        <div className="max-w-xl space-y-6">
+        <div className="space-y-6">
 
           {/* ── Dosage Forms ── */}
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Droplets size={16} className="text-[#22A68C]" />
                 <label className="text-sm font-semibold text-foreground">
@@ -313,23 +329,12 @@ export default function PreferencesSection() {
                 <button
                   type="button"
                   onClick={() => setShowDetailed((v) => !v)}
-                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
                 >
-                  {showDetailed ? "Simplified" : "More precision"}
+                  {showDetailed ? "Simplify" : "Refine"}
                 </button>
               )}
             </div>
-
-            {ageDescription && !dosageFormPreferencesSaved && (
-              <p className="text-xs text-muted-foreground mb-2">
-                Defaults set for age: {ageDescription}. Adjust to lock your preferences.
-              </p>
-            )}
-            {!ageDescription && !dosageFormPreferencesSaved && (
-              <p className="text-xs text-muted-foreground mb-2">
-                Add your age in the Profile section to auto-fill age-appropriate defaults.
-              </p>
-            )}
 
             {loadingTree ? (
               <div className="space-y-2 animate-pulse">
@@ -337,40 +342,96 @@ export default function PreferencesSection() {
               </div>
             ) : !tree || tree.groups.length === 0 ? (
               <p className="text-sm text-muted-foreground">No dosage forms available.</p>
-            ) : (
-              <div className="space-y-6">
-                {tree.groups.map((group) => (
-                  <div key={group.id}>
-                    {group.categories.length > 0 && (
+            ) : showDetailed ? (
+              /* ── Detailed: leaves grouped under Solid / Non-Solid headers ── */
+              <div className="space-y-4">
+                {tree.groups.map((group) => {
+                  // Collect all leaves for the group (flatten categories)
+                  const allGroupLeaves = [
+                    ...(group.selfLeaf ? [group.selfLeaf] : []),
+                    ...group.categories.flatMap((cat) => cat.selfLeaf ? [cat.selfLeaf] : cat.leaves),
+                  ];
+                  if (allGroupLeaves.length === 0) return null;
+                  return (
+                    <div key={group.id}>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                         {group.displayName}
                       </p>
-                    )}
-                    {showDetailed ? (
-                      <DetailedGroup
-                        group={group}
-                        selectedSet={selectedSet}
-                        onCategoryToggle={toggleCategory}
-                        onLeafToggle={toggleLeaf}
-                      />
-                    ) : (
-                      <SimplifiedGroup
-                        group={group}
-                        selectedSet={selectedSet}
-                        onCategoryToggle={toggleCategory}
-                        onLeafToggle={toggleLeaf}
-                      />
-                    )}
-                  </div>
-                ))}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                        {allGroupLeaves.map((leaf) => (
+                          <LeafCheckbox
+                            key={leaf.id}
+                            leaf={leaf}
+                            selectedSet={selectedSet}
+                            onToggle={toggleLeaf}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            ) : (
+              /* ── Simplified: 3-button pill selector ── */
+              (() => {
+                const solidGroup = tree.groups.find((g) => g.displayName.toLowerCase().includes("solid") && !g.displayName.toLowerCase().includes("non"));
+                const nonSolidGroup = tree.groups.find((g) => g.displayName.toLowerCase().includes("non"));
+                const solidLeafNames = solidGroup
+                  ? [...(solidGroup.selfLeaf ? [solidGroup.selfLeaf.nodeName] : []), ...solidGroup.categories.flatMap((c) => c.selfLeaf ? [c.selfLeaf.nodeName] : c.leaves.map((l) => l.nodeName))]
+                  : [];
+                const nonSolidLeafNames = nonSolidGroup
+                  ? [...(nonSolidGroup.selfLeaf ? [nonSolidGroup.selfLeaf.nodeName] : []), ...nonSolidGroup.categories.flatMap((c) => c.selfLeaf ? [c.selfLeaf.nodeName] : c.leaves.map((l) => l.nodeName))]
+                  : [];
+                const allLeafNames = tree.allLeaves.map((l) => l.nodeName);
 
-            {selected.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-3">
-                {selected.length} form{selected.length !== 1 ? "s" : ""} selected
-                {" — "}products with no form on file always shown.
-              </p>
+                const isSolidOnly = solidLeafNames.length > 0 && solidLeafNames.every((n) => selectedSet.has(n)) && nonSolidLeafNames.every((n) => !selectedSet.has(n));
+                const isNonSolidOnly = nonSolidLeafNames.length > 0 && nonSolidLeafNames.every((n) => selectedSet.has(n)) && solidLeafNames.every((n) => !selectedSet.has(n));
+                const isAny = allLeafNames.length > 0 && allLeafNames.every((n) => selectedSet.has(n));
+
+                const selectSolidOnly = () => {
+                  setSelected(solidLeafNames);
+                  setAcceptedDosageFormNames(solidLeafNames);
+                  setDosageFormPreferencesSaved(true);
+                  saveSection("preferences");
+                };
+                const selectAny = () => {
+                  setSelected(allLeafNames);
+                  setAcceptedDosageFormNames(allLeafNames);
+                  setDosageFormPreferencesSaved(true);
+                  saveSection("preferences");
+                };
+                const selectNonSolidOnly = () => {
+                  setSelected(nonSolidLeafNames);
+                  setAcceptedDosageFormNames(nonSolidLeafNames);
+                  setDosageFormPreferencesSaved(true);
+                  saveSection("preferences");
+                };
+
+                const options = [
+                  { label: "Solid only", active: isSolidOnly, onClick: selectSolidOnly },
+                  { label: "Any", active: isAny, onClick: selectAny },
+                  { label: "Non-solid only", active: isNonSolidOnly, onClick: selectNonSolidOnly },
+                ];
+
+                return (
+                  <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+                    {options.map((opt) => (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={opt.onClick}
+                        className={`min-w-[60px] px-2.5 py-1 text-xs font-medium transition-colors border-r last:border-r-0 border-border whitespace-nowrap ${
+                          opt.active
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()
             )}
           </div>
 
@@ -461,15 +522,15 @@ export default function PreferencesSection() {
                   <span className="text-sm font-semibold text-foreground">Product number</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent><p>Combine up to 1–3 products</p></TooltipContent>
+              <TooltipContent><p>Combine up to 1–2 products</p></TooltipContent>
             </Tooltip>
-            <div className="flex items-center rounded-lg border border-border overflow-hidden w-fit">
-              {([1, 2, 3] as const).map((n) => (
+            <div className="flex rounded-lg border border-border overflow-hidden w-fit">
+              {([1, 2] as const).map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => { setMaxBundleSize(n); saveSection("preferences"); }}
-                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border ${
+                  className={`min-w-[60px] px-2.5 py-1 text-xs font-medium transition-colors border-r last:border-r-0 border-border ${
                     maxBundleSize === n
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -483,7 +544,6 @@ export default function PreferencesSection() {
 
         </div>
         </TooltipProvider>
-      </div>
-    </section>
+    </div>
   );
 }

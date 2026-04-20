@@ -313,10 +313,14 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 - "Explore Similar" feature on liked products in Matches
 
 ### UX & Content
+- **Search medications by diseases** — allow users to find medications by searching for a disease/condition name, then select from medications commonly prescribed for that condition. Requires a disease-to-medication mapping (ontology or external API). Button placeholder already exists in ProfileSection Medications sub-section.
 - **Explanation level selector** — let users choose how much detail they see (e.g. "Simple" / "Standard" / "Expert"). At the "Simple" level all copy should be plain language aimed at adults with no domain knowledge: no Latin names, no clinical jargon, short sentences. Applies to: nutrient tooltips, rule descriptions, product card explanations, and any other copy that currently assumes domain knowledge.
 
 ### Accessibility & Legal
 - **Web accessibility (avoid legal risk)** — audit and implement WCAG 2.1 AA compliance before launch. Covers: keyboard navigation, screen reader support (ARIA labels), sufficient color contrast, focus indicators, alt text on images, and accessible form inputs. Required in both Israel (Equal Rights for Persons with Disabilities Law) and the US (ADA / Section 508).
+
+### Design Decisions
+- **Product cards: equal height per row (not masonry)** — Cards in the Matches grid use equal-height rows (CSS grid default stretch). This means shorter cards have empty space at the bottom, but the reading order is natural left-to-right (1,2 then 3,4). The alternative (CSS `columns` masonry) would eliminate empty space but changes the reading order to column-first (1,3,5 left; 2,4,6 right), which is confusing for ranked results. Decision: keep uniform row height for predictable reading order.
 
 ### Maintenance
 - Delete test rule "test1" (needs service role key or SQL Editor)

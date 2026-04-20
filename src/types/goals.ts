@@ -16,10 +16,10 @@ export const MAX_SELECTED_GOALS = 3;
  * Goals shown per category are the direct children of that node.
  */
 export const GOAL_CATEGORIES = [
-  { label: "Health",       node_name: "HEALTH_GOALS_CATEGORY", icon: Stethoscope },
-  { label: "Cognitive",    node_name: "COGNITIVE_CATEGORY",     icon: Brain       },
+  { label: "Mind",         node_name: "COGNITIVE_CATEGORY",     icon: Brain       },
   { label: "Beauty",       node_name: "BEAUTY_CATEGORY",        icon: Sparkles    },
   { label: "Fitness",      node_name: "FITNESS_CATEGORY",       icon: Dumbbell    },
-  { label: "Reproductive", node_name: "REPRODUCTIVE_CATEGORY",  icon: Heart       },
-  { label: "Longevity",    node_name: "LONGEVITY_CATEGORY",     icon: Hourglass   },
+  { label: "Fertility",    node_name: "REPRODUCTIVE_CATEGORY",  icon: Heart       },
+  { label: "Vitality",     node_name: "LONGEVITY_CATEGORY",     icon: Hourglass   },
+  { label: "Health",       node_name: "HEALTH_GOALS_CATEGORY",  icon: Stethoscope },
 ] as const;

@@ -21,7 +21,8 @@ function approachLabel(qualityWeight: number): string {
   return `${Math.round(qualityWeight * 100)}% quality`;
 }
 
-const MAX_DISPLAYED = 10;
+const PAGE_SIZE = 16;
+const MAX_PAGES = 5;
 
 export default function MatchesSection() {
   const {
@@ -29,7 +30,6 @@ export default function MatchesSection() {
     qualityWeight,
     maxBundleSize,
     diversityWeight,
-    setDiversityWeight,
     savedSections,
     acceptedDosageFormNames,
     gender,
@@ -42,6 +42,7 @@ export default function MatchesSection() {
     weightKg,
   } = useRecommendationContext();
   const hasAnySection = savedSections.size > 0;
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   const { data: result, isLoading: isRecommending } = useRecommendations({
     goalIds,
@@ -102,26 +103,13 @@ export default function MatchesSection() {
   const allSectionsSaved = PERSONALIZE_SECTION_ORDER.every((s) => savedSections.has(s));
 
   return (
-    <section id="matches" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-3">
-          <h2
-            className="font-heading text-foreground text-3xl cursor-default"
-            title="Supplements matched to your personal profile."
-          >
-            Matches
-          </h2>
-
-          {/* Controls row */}
-          <div className="flex flex-wrap items-end gap-3">
-            <DiversityControl value={diversityWeight} onChange={setDiversityWeight} />
-          </div>
-        </div>
-
-        {/* Personalization summary card */}
-        {hasAnySection && (
-          <PersonalizationProgress savedSections={savedSections} />
-        )}
+    <div id="matches">
+        <h2
+          className="font-heading text-foreground text-3xl mb-3 cursor-default"
+          title="Supplements matched to your personal profile."
+        >
+          Matches
+        </h2>
 
         {/* Dosage form fallback warning */}
         {result?.dosageFormFallback && (
@@ -155,7 +143,7 @@ export default function MatchesSection() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {rankedProducts.slice(0, MAX_DISPLAYED).map((rp, idx) => {
+              {rankedProducts.slice(0, displayCount).map((rp, idx) => {
                 const key = rp.products.map((p) => p.id).join("-");
                 const isBundle = rp.products.length > 1;
                 return isBundle ? (
@@ -177,87 +165,31 @@ export default function MatchesSection() {
                 );
               })}
             </div>
-            <p className="text-muted-foreground text-sm mt-6">
-              Showing top {Math.min(rankedProducts.length, MAX_DISPLAYED)} of{" "}
-              {rankedProducts.length} matches.
-              {!allSectionsSaved && " Complete your profile for more accurate results."}
-            </p>
+            <div className="flex items-center gap-4 mt-6">
+              <p className="text-muted-foreground text-sm">
+                Showing top {Math.min(rankedProducts.length, displayCount)} matches.
+              </p>
+              {displayCount < Math.min(rankedProducts.length, PAGE_SIZE * MAX_PAGES) && (
+                <button
+                  type="button"
+                  onClick={() => setDisplayCount((c) => Math.min(c + PAGE_SIZE, PAGE_SIZE * MAX_PAGES, rankedProducts.length))}
+                  className="text-sm text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
+                >
+                  More products
+                </button>
+              )}
+              {displayCount > PAGE_SIZE && (
+                <button
+                  type="button"
+                  onClick={() => setDisplayCount(PAGE_SIZE)}
+                  className="text-sm text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
+                >
+                  Less
+                </button>
+              )}
+            </div>
           </>
         )}
-      </div>
-    </section>
-  );
-}
-
-// ── Diversity control ─────────────────────────────────────────────────────────
-
-const DIVERSITY_OPTIONS: { value: number; label: string; title: string }[] = [
-  { value: 0, label: "Focused", title: "Show the highest-scoring results (no diversity re-ranking)" },
-  { value: 0.5, label: "Balanced", title: "Balance relevance with variety" },
-  { value: 1, label: "Diverse", title: "Maximise variety across brands and nutrients" },
-];
-
-function DiversityControl({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (w: number) => void;
-}) {
-  const [showSlider, setShowSlider] = useState(false);
-
-  // Snap to nearest discrete option for display purposes
-  const activeOption =
-    DIVERSITY_OPTIONS.find((o) => o.value === value) ?? null;
-
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Diversity</span>
-        <button
-          type="button"
-          onClick={() => setShowSlider((v) => !v)}
-          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
-          title={showSlider ? "Show presets" : "More precision"}
-        >
-          {showSlider ? "Presets" : "More precision"}
-        </button>
-      </div>
-
-      {showSlider ? (
-        <div className="flex items-center gap-2 h-[30px]">
-          <span className="text-xs text-muted-foreground w-14 text-right">
-            {activeOption?.label ?? `${Math.round(value * 100)}%`}
-          </span>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={value}
-            onChange={(e) => onChange(Number(e.target.value))}
-            className="w-28 accent-primary"
-          />
-        </div>
-      ) : (
-        <div className="flex items-center rounded-lg border border-border overflow-hidden">
-          {DIVERSITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              title={opt.title}
-              onClick={() => onChange(opt.value)}
-              className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border whitespace-nowrap ${
-                value === opt.value
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

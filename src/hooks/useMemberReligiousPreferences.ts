@@ -72,8 +72,8 @@ export function useMemberReligiousPreferences() {
   const togglePreference = useCallback((pref: SelectedReligiousPreference) => {
     setPreferences((prev) =>
       prev.some((p) => p.id === pref.id)
-        ? prev.filter((p) => p.id !== pref.id)
-        : [...prev, pref],
+        ? []
+        : [pref],
     );
   }, []);
 

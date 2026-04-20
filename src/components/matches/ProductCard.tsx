@@ -42,7 +42,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
   };
 
   return (
-    <div className={`rounded-xl border p-4 transition-colors ${
+    <div className={`rounded-xl border p-4 transition-colors h-full flex flex-col ${
       inCart
         ? "bg-[#E3EFE9] border-[#22A68C]"
         : "bg-card border-border hover:border-primary/40"
@@ -93,7 +93,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
               </span>
               <p
                 onClick={() => setTitleExpanded((v) => !v)}
-                className={`text-sm font-medium text-foreground leading-snug min-h-[2.5rem] cursor-pointer select-none ${
+                className={`text-sm font-medium text-foreground leading-snug cursor-pointer select-none ${
                   titleExpanded ? "" : "line-clamp-2"
                 }`}
               >
@@ -133,21 +133,23 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
       </div>
 
       {/* Nutrient match pills + extra ingredients */}
-      {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {allNutrients.map(({ id, matched }) => (
-            <NutrientMatchPill
-              key={id}
-              label={nutrientNames.get(id) ?? id}
-              matched={matched}
-              tooltip={nutrientDescriptions.get(id)}
-            />
-          ))}
-          <ExtraIngredientsPill names={extraIngredientNames} />
-        </div>
-      )}
+      <div className="mt-3 flex-1">
+        {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
+          <div className="flex flex-wrap gap-1.5">
+            {allNutrients.map(({ id, matched }) => (
+              <NutrientMatchPill
+                key={id}
+                label={nutrientNames.get(id) ?? id}
+                matched={matched}
+                tooltip={nutrientDescriptions.get(id)}
+              />
+            ))}
+            <ExtraIngredientsPill names={extraIngredientNames} />
+          </div>
+        )}
+      </div>
 
-      {/* Cart control */}
+      {/* Cart control — pushed to bottom */}
       <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
         <AddToCartButton product={product} />
       </div>

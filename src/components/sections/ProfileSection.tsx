@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Baby, Map, UtensilsCrossed, Pill, HeartPulse, Ruler, X } from "lucide-react";
+import { Baby, CalendarDays, ChevronDown, Map, UtensilsCrossed, Pill, HeartPulse, Ruler, X } from "lucide-react";
 import { MedicationSearch } from "@/components/profile/MedicationSearch";
 import { HealthConditionSearch } from "@/components/profile/HealthConditionSearch";
 import { BodyMap } from "@/components/profile/BodyMap";
@@ -98,6 +98,8 @@ export default function ProfileSection() {
   } = useMemberHealthConditions();
 
   const [showBodyMap, setShowBodyMap] = useState(true);
+  const [reproDropdownOpen, setReproDropdownOpen] = useState(false);
+  const [foodDropdownOpen, setFoodDropdownOpen] = useState(false);
 
   // Gender
   const [selectedGender, setSelectedGender] = useState<string>(
@@ -215,6 +217,23 @@ export default function ProfileSection() {
   }, [user, setContextBodySize, setContextHeightCm, setContextWeightKg]);
 
   // ── Auto-save medications & conditions on change ──────────────────────────
+
+  // Close dropdowns on outside click
+  const reproDropdownRef = useRef<HTMLDivElement>(null);
+  const foodDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!reproDropdownOpen && !foodDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (reproDropdownOpen && reproDropdownRef.current && !reproDropdownRef.current.contains(e.target as Node)) {
+        setReproDropdownOpen(false);
+      }
+      if (foodDropdownOpen && foodDropdownRef.current && !foodDropdownRef.current.contains(e.target as Node)) {
+        setFoodDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [reproDropdownOpen, foodDropdownOpen]);
 
   const medsAutoSaveRef = useRef(false);
   useEffect(() => {
@@ -372,15 +391,7 @@ export default function ProfileSection() {
   const isFemale = selectedGender === "FEMALE";
 
   return (
-    <section id="profile" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <h2
-          className="font-heading text-foreground text-3xl mb-3 cursor-default"
-          title="Share a bit about yourself to get personalized supplements."
-        >
-          Profile
-        </h2>
-
+    <div id="profile">
         <div className="space-y-5">
 
           {/* ── Gender + Age (same row) ── */}
@@ -414,133 +425,147 @@ export default function ProfileSection() {
             </div>
 
             {/* Age */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-semibold text-foreground flex-shrink-0">Age</span>
-              <div className="flex items-end gap-3 flex-wrap">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground">Year of birth</label>
-                  <input
-                    type="number"
-                    min={1900}
-                    max={CURRENT_YEAR}
-                    value={birthYear}
-                    onChange={(e) => setBirthYear(e.target.value)}
-                    onBlur={handleBirthYearBlur}
-                    placeholder="YYYY"
-                    className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-muted-foreground">Month of birth</label>
-                  <select
-                    value={birthMonth}
-                    onChange={(e) => handleBirthMonthChange(e.target.value)}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                  >
-                    <option value="">Month</option>
-                    {MONTHS.map((name, i) => (
-                      <option key={i + 1} value={i + 1}>{name}</option>
-                    ))}
-                  </select>
-                </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <CalendarDays size={16} className="text-[#22A68C]" />
+                <span className="text-sm font-semibold text-foreground">Age</span>
               </div>
+              <input
+                type="number"
+                min={1900}
+                max={CURRENT_YEAR}
+                value={birthYear}
+                onChange={(e) => setBirthYear(e.target.value)}
+                onBlur={handleBirthYearBlur}
+                placeholder="Year"
+                className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+              />
+              <select
+                value={birthMonth}
+                onChange={(e) => handleBirthMonthChange(e.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+              >
+                <option value="">Month</option>
+                {MONTHS.map((name, i) => (
+                  <option key={i + 1} value={i + 1}>{name}</option>
+                ))}
+              </select>
             </div>
 
           </div>
 
           {/* ── Reproductive status (female only) ── */}
           {isFemale && (
-            <div className="overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <Baby size={16} className="text-[#22A68C]" />
+                <span className="text-sm font-semibold text-foreground">
+                  Fertility Status
+                </span>
+              </div>
               {loadingReproductive ? (
-                <div className="flex gap-2 animate-pulse">
-                  {[1, 2, 3, 4].map((i) => <div key={i} className="h-8 w-24 rounded-full bg-muted" />)}
-                </div>
+                <div className="h-8 w-28 rounded-full bg-muted animate-pulse" />
               ) : (
-                <div className="flex items-center gap-3 min-w-max">
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <Baby size={16} className="text-[#22A68C]" />
-                    <span className="text-sm font-semibold text-foreground">
-                      Reproductive status
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    {[...(reproductiveNodes ?? [])]
-                      .sort((a, b) => {
-                        const ORDER = ["PRENATAL", "PREGNANCY", "BREASTFEEDING", "PREMENOPAUSAL", "MENOPAUSAL", "POSTMENOPAUSAL"];
-                        const ai = ORDER.indexOf(a.nodeName);
-                        const bi = ORDER.indexOf(b.nodeName);
-                        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-                      })
-                      .map((node) => {
-                        const isSelected = selectedReproductiveStatus === node.nodeName;
-                        return (
-                          <button
-                            key={node.id}
-                            type="button"
-                            onClick={() => handleReproSelect(node.nodeName)}
-                            className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                              isSelected
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                            }`}
-                          >
-                            {node.displayName}
-                          </button>
-                        );
-                      })}
-                    {/* None — last, selected by default */}
-                    <button
-                      type="button"
-                      onClick={() => handleReproSelect("")}
-                      className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                        selectedReproductiveStatus === ""
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                      }`}
-                    >
-                      None
-                    </button>
-                  </div>
+                <div className="relative" ref={reproDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setReproDropdownOpen((v) => !v)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                      selectedReproductiveStatus
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {selectedReproductiveStatus
+                      ? (reproductiveNodes ?? []).find((n) => n.nodeName === selectedReproductiveStatus)?.displayName ?? selectedReproductiveStatus
+                      : "None"}
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform duration-200 ${reproDropdownOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {reproDropdownOpen && (
+                    <div className="absolute z-50 mt-1 left-0 rounded-xl border border-border bg-popover shadow-lg overflow-hidden min-w-[160px]">
+                      {[...(reproductiveNodes ?? [])]
+                        .sort((a, b) => {
+                          const ORDER = ["PRENATAL", "PREGNANCY", "BREASTFEEDING", "PREMENOPAUSAL", "MENOPAUSAL", "POSTMENOPAUSAL"];
+                          const ai = ORDER.indexOf(a.nodeName);
+                          const bi = ORDER.indexOf(b.nodeName);
+                          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                        })
+                        .map((node) => {
+                          const isActive = selectedReproductiveStatus === node.nodeName;
+                          return (
+                            <label
+                              key={node.id}
+                              className={`flex items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors ${
+                                isActive ? "bg-primary/10 text-primary font-medium" : "text-foreground hover:bg-muted"
+                              }`}
+                              onClick={() => { handleReproSelect(node.nodeName); setReproDropdownOpen(false); }}
+                            >
+                              <input
+                                type="radio"
+                                checked={isActive}
+                                readOnly
+                                className="h-3.5 w-3.5 accent-primary cursor-pointer flex-shrink-0"
+                              />
+                              {node.displayName}
+                            </label>
+                          );
+                        })}
+                      <label
+                        className={`flex items-center gap-2 px-4 py-2 text-sm cursor-pointer transition-colors border-t border-border ${
+                          selectedReproductiveStatus === ""
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-foreground hover:bg-muted"
+                        }`}
+                        onClick={() => { handleReproSelect(""); setReproDropdownOpen(false); }}
+                      >
+                        <input
+                          type="radio"
+                          checked={selectedReproductiveStatus === ""}
+                          readOnly
+                          className="h-3.5 w-3.5 accent-primary cursor-pointer flex-shrink-0"
+                        />
+                        None
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
           {/* ── Food restrictions ── */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <UtensilsCrossed size={16} className="text-[#22A68C]" />
-                <span className="text-sm font-semibold text-foreground">Food restrictions</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Products are screened for these labels, but always check before ordering and using to ensure safety.
-              </p>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2 cursor-default" title="Products are screened for these labels, but always check before ordering and using to ensure safety.">
+              <UtensilsCrossed size={16} className="text-[#22A68C]" />
+              <span className="text-sm font-semibold text-foreground">Food restrictions</span>
             </div>
             {loadingRestrictions ? (
-              <div className="flex gap-2 animate-pulse">
-                {[1, 2, 3].map((i) => <div key={i} className="h-8 w-16 rounded-full bg-muted" />)}
+              <div className="flex gap-4 animate-pulse">
+                {[1, 2, 3].map((i) => <div key={i} className="h-5 w-20 rounded bg-muted" />)}
               </div>
             ) : (
-              <div className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-hide">
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                 {(restrictionNodes ?? [])
                   .filter((n) => !["vegan", "vegetarian"].includes(n.displayName.toLowerCase()))
                   .map((node) => {
                     const isSelected = selectedRestrictions.includes(node.nodeName);
                     const label = node.displayName.replace(/\s*Free$/i, "");
                     return (
-                      <button
-                        key={node.id}
-                        type="button"
-                        onClick={() => toggleRestriction(node.nodeName)}
-                        className={`rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
-                          isSelected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                        }`}
-                      >
-                        {label}
-                      </button>
+                      <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRestriction(node.nodeName)}
+                          className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
+                        />
+                        <span className={`text-sm ${isSelected ? "text-primary font-medium" : "text-foreground"} group-hover:text-foreground/80`}>
+                          {label}
+                        </span>
+                      </label>
                     );
                   })}
               </div>
@@ -549,79 +574,54 @@ export default function ProfileSection() {
 
           {/* ── Medications ── */}
           <div>
-            <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <Pill size={16} className="text-[#22A68C]" />
-                <label className="text-sm font-semibold text-foreground">
-                  Medications
-                </label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Add any medications you are currently taking. We use this to flag nutrients that may interact with your prescriptions.
-              </p>
+            <div className="flex items-center gap-1.5 mb-2 cursor-default" title="Add any medications you are currently taking. We use this to flag nutrients that may interact with your prescriptions.">
+              <Pill size={16} className="text-[#22A68C]" />
+              <label className="text-sm font-semibold text-foreground cursor-default">
+                Medications
+              </label>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="w-full max-w-lg">
-                <MedicationSearch
-                  allMedications={allMedications ?? []}
-                  selected={medications}
-                  onAdd={addMedication}
-                  onRemove={removeMedication}
-                  isLoading={loadingMeds}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {/* TODO: search medications by diseases */}}
-                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors flex-shrink-0"
-              >
-                Search medications by diseases
-              </button>
-            </div>
+            <MedicationSearch
+              allMedications={allMedications ?? []}
+              selected={medications}
+              onAdd={addMedication}
+              onRemove={removeMedication}
+              isLoading={loadingMeds}
+            />
           </div>
 
           {/* ── Health Conditions ── */}
           <div>
-            <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <HeartPulse size={16} className="text-[#22A68C]" />
-                <label className="text-sm font-semibold text-foreground">
-                  Health Conditions
-                </label>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Add any health conditions you want to account for. We use these to tailor nutrient priorities in your recommendations.
-              </p>
+            <div className="flex items-center gap-1.5 mb-2 cursor-default" title="Add any health conditions you want to account for. We use these to tailor nutrient priorities in your recommendations.">
+              <HeartPulse size={16} className="text-[#22A68C]" />
+              <label className="text-sm font-semibold text-foreground cursor-default">
+                Health Conditions
+              </label>
             </div>
 
             {loadingConditions ? (
               <div className="h-10 w-64 rounded-lg bg-muted animate-pulse" />
             ) : (
-              <div className="flex gap-4 items-start">
-                {/* Search column */}
-                <div className={showBodyMap ? "flex-1 min-w-0" : "w-full max-w-lg"}>
-                  <HealthConditionSearch
-                    allConditions={conditionTree?.allLeaves ?? []}
-                    selected={conditions}
-                    onAdd={addCondition}
-                    onRemove={removeCondition}
-                    isLoading={loadingConditions}
-                  />
-                </div>
+              <div className="space-y-2">
+                <HealthConditionSearch
+                  allConditions={conditionTree?.allLeaves ?? []}
+                  selected={conditions}
+                  onAdd={addCondition}
+                  onRemove={removeCondition}
+                  isLoading={loadingConditions}
+                />
 
-                {/* Show body map button — to the right of the search box, centered on the input row */}
                 {!showBodyMap && (
                   <button
                     type="button"
                     onClick={() => setShowBodyMap(true)}
-                    className="inline-flex flex-shrink-0 self-end mb-[9px] items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     <Map size={13} />
                     Show body map
                   </button>
                 )}
 
-                {/* Body map column */}
+                {/* Body map — stacked below search */}
                 {showBodyMap && (
                   <BodyMap
                     groups={conditionTree?.groups ?? []}
@@ -636,168 +636,178 @@ export default function ProfileSection() {
 
           {/* ── Physical size / Measurements ── */}
           <div>
-            <div className="flex items-center gap-3 flex-wrap mb-2">
+            <div className="flex items-center gap-3 mb-2 cursor-default" title="Helps us estimate appropriate nutrient dosages for your body.">
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <Ruler size={16} className="text-[#22A68C]" />
                 <span className="text-sm font-semibold text-foreground">Physical size</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Helps us estimate appropriate nutrient dosages for your body.
-              </p>
+              {!precisionOpen && (
+                <button
+                  type="button"
+                  onClick={() => setPrecisionOpen(true)}
+                  className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                >
+                  Refine
+                </button>
+              )}
             </div>
 
             {!precisionOpen ? (
               /* ── Simple 3-state mode ── */
-              <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex gap-2">
-                  {(["LOW", "MEDIUM", "HIGH"] as const).map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => handleBodySizeSelect(size)}
-                      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
-                        bodySizeLocal === size
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                      }`}
-                    >
-                      {size === "LOW" ? "Small" : size === "MEDIUM" ? "Medium" : "Large"}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPrecisionOpen(true)}
-                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
-                >
-                  More precision
-                </button>
+              <div className="flex gap-2">
+                {(["LOW", "MEDIUM", "HIGH"] as const).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => handleBodySizeSelect(size)}
+                    className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                      bodySizeLocal === size
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {size === "LOW" ? "Small" : size === "MEDIUM" ? "Medium" : "Large"}
+                  </button>
+                ))}
               </div>
             ) : (
               /* ── Precision mode ── */
-              <div className="flex items-center gap-4 flex-wrap">
+              <div className="space-y-2">
+                {/* Units + Less precision row */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Units:</span>
+                    <div className="flex rounded-lg border border-border overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => handleUnitToggle(false)}
+                        className={`px-2 py-0.5 text-xs font-medium transition-colors border-r border-border ${
+                          !useImperialLocal
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Metric
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUnitToggle(true)}
+                        className={`px-2 py-0.5 text-xs font-medium transition-colors ${
+                          useImperialLocal
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        Imperial
+                      </button>
+                    </div>
+                  </div>
 
-                {/* Units toggle */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Units:</span>
-                  <div className="flex rounded-lg border border-border overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => handleUnitToggle(false)}
-                      className={`px-3 py-1 text-xs font-medium transition-colors border-r border-border ${
-                        !useImperialLocal
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      Metric
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUnitToggle(true)}
-                      className={`px-3 py-1 text-xs font-medium transition-colors ${
-                        useImperialLocal
-                          ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                    >
-                      Imperial
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { finalHeightCm, finalWeightKg } = computeCurrentMeasurements();
+                      if (finalHeightCm && finalWeightKg) {
+                        const heightM = finalHeightCm / 100;
+                        const bmi = finalWeightKg / (heightM * heightM);
+                        const size = bmi < 20 ? "LOW" : bmi <= 27 ? "MEDIUM" : "HIGH";
+                        setBodySizeLocal(size);
+                        setContextBodySize(size);
+                        saveBasicProfile(size, finalHeightCm, finalWeightKg);
+                        saveSection("profile");
+                      }
+                      setPrecisionOpen(false);
+                    }}
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    Simplify
+                  </button>
+                </div>
+
+                {/* Height + Weight on same line */}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Height</span>
+                    {!useImperialLocal ? (
+                      <>
+                        <input
+                          type="number"
+                          min={50}
+                          max={280}
+                          value={heightCmInput}
+                          onChange={(e) => setHeightCmInput(e.target.value)}
+                          onBlur={handleHeightBlur}
+                          placeholder="170"
+                          className="w-14 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-xs text-muted-foreground">cm</span>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min={1}
+                          max={9}
+                          value={heightFtInput}
+                          onChange={(e) => setHeightFtInput(e.target.value)}
+                          onBlur={handleHeightBlur}
+                          placeholder="5"
+                          className="w-10 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-xs text-muted-foreground">ft</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={11}
+                          value={heightInInput}
+                          onChange={(e) => setHeightInInput(e.target.value)}
+                          onBlur={handleHeightBlur}
+                          placeholder="8"
+                          className="w-10 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-xs text-muted-foreground">in</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted-foreground">Weight</span>
+                    {!useImperialLocal ? (
+                      <>
+                        <input
+                          type="number"
+                          min={20}
+                          max={500}
+                          value={weightKgInput}
+                          onChange={(e) => setWeightKgInput(e.target.value)}
+                          onBlur={handleWeightBlur}
+                          placeholder="70"
+                          className="w-14 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-xs text-muted-foreground">kg</span>
+                      </>
+                    ) : (
+                      <>
+                        <input
+                          type="number"
+                          min={44}
+                          max={1100}
+                          value={weightLbsInput}
+                          onChange={(e) => setWeightLbsInput(e.target.value)}
+                          onBlur={handleWeightBlur}
+                          placeholder="155"
+                          className="w-14 rounded-lg border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
+                        />
+                        <span className="text-xs text-muted-foreground">lbs</span>
+                      </>
+                    )}
                   </div>
                 </div>
-
-                {/* Height */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Height</span>
-                  {!useImperialLocal ? (
-                    <>
-                      <input
-                        type="number"
-                        min={50}
-                        max={280}
-                        value={heightCmInput}
-                        onChange={(e) => setHeightCmInput(e.target.value)}
-                        onBlur={handleHeightBlur}
-                        placeholder="e.g. 170"
-                        className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                      />
-                      <span className="text-sm text-muted-foreground">cm</span>
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        min={1}
-                        max={9}
-                        value={heightFtInput}
-                        onChange={(e) => setHeightFtInput(e.target.value)}
-                        onBlur={handleHeightBlur}
-                        placeholder="ft"
-                        className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                      />
-                      <span className="text-sm text-muted-foreground">ft</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={11}
-                        value={heightInInput}
-                        onChange={(e) => setHeightInInput(e.target.value)}
-                        onBlur={handleHeightBlur}
-                        placeholder="in"
-                        className="w-16 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                      />
-                      <span className="text-sm text-muted-foreground">in</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Weight */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Weight</span>
-                  {!useImperialLocal ? (
-                    <>
-                      <input
-                        type="number"
-                        min={20}
-                        max={500}
-                        value={weightKgInput}
-                        onChange={(e) => setWeightKgInput(e.target.value)}
-                        onBlur={handleWeightBlur}
-                        placeholder="e.g. 70"
-                        className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                      />
-                      <span className="text-sm text-muted-foreground">kg</span>
-                    </>
-                  ) : (
-                    <>
-                      <input
-                        type="number"
-                        min={44}
-                        max={1100}
-                        value={weightLbsInput}
-                        onChange={(e) => setWeightLbsInput(e.target.value)}
-                        onBlur={handleWeightBlur}
-                        placeholder="e.g. 155"
-                        className="w-24 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/20 transition-colors"
-                      />
-                      <span className="text-sm text-muted-foreground">lbs</span>
-                    </>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setPrecisionOpen(false)}
-                  className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline transition-colors"
-                >
-                  Less precision
-                </button>
               </div>
             )}
           </div>
 
         </div>
-      </div>
-    </section>
+    </div>
   );
 }

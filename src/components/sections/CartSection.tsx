@@ -5,8 +5,7 @@ export default function CartSection() {
   const { items, totalCost, itemCount } = useCart();
 
   return (
-    <section id="cart" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <div id="cart">
         <h2
           className="font-heading text-foreground text-3xl mb-3 cursor-default"
           title="Products you've selected from your matches."
@@ -53,8 +52,7 @@ export default function CartSection() {
             </div>
           </div>
         )}
-      </div>
-    </section>
+    </div>
   );
 }
 

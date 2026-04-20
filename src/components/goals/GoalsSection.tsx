@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from "react";
-import { X, Check } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { X, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { useGoals } from "@/hooks/useGoals";
-import { useAuth } from "@/hooks/useAuth";
 import { useRecommendationContext } from "@/context/RecommendationContext";
 import { GOAL_CATEGORIES, MAX_SELECTED_GOALS } from "@/types/goals";
 import type { Goal } from "@/types/goals";
@@ -18,20 +18,18 @@ import type { Goal } from "@/types/goals";
  */
 export default function GoalsSection() {
   const { goalNodes, loading } = useGoals();
-  const { user } = useAuth();
 
   const {
     selectedGoals,
     setSelectedGoals,
     saveSection,
-    scrollToNextSection,
   } = useRecommendationContext();
 
   // Active category tab — default to first
   const [activeCategory, setActiveCategory] = useState<string>(
     GOAL_CATEGORIES[0].node_name,
   );
-  const [rowExpanded, setRowExpanded] = useState(false);
+  const [rowExpanded, setRowExpanded] = useState(true);
 
   // Measurement refs and state
   const pillsOuterRef = useRef<HTMLDivElement>(null); // outer container (flex-1)
@@ -42,7 +40,7 @@ export default function GoalsSection() {
 
   const handleCategoryChange = (nodeName: string) => {
     setActiveCategory(nodeName);
-    setRowExpanded(false);
+    setRowExpanded(true);
     setVisibleCount(999);
     setPillsOverflow(false);
   };
@@ -82,7 +80,8 @@ export default function GoalsSection() {
     );
   };
 
-  const currentGoals = goalsForCategory(activeCategory);
+  const currentGoals = goalsForCategory(activeCategory)
+    .sort((a, b) => a.display_name.length - b.display_name.length);
 
   // ── Measure how many pills fit on one line ────────────────────────────────
   //
@@ -92,11 +91,6 @@ export default function GoalsSection() {
   // A ResizeObserver re-runs the calculation on every container resize.
 
   useEffect(() => {
-    if (rowExpanded) {
-      setPillsOverflow(false);
-      return;
-    }
-
     const outer   = pillsOuterRef.current;
     const measure = measureRef.current;
     if (!outer || !measure) return;
@@ -119,7 +113,6 @@ export default function GoalsSection() {
       }
 
       if (count >= currentGoals.length) {
-        // All pills fit — no "More" needed
         setVisibleCount(currentGoals.length);
         setPillsOverflow(false);
       } else {
@@ -157,96 +150,81 @@ export default function GoalsSection() {
     }
   };
 
-  const handleSaveGoals = () => {
-    if (selectedGoals.length === 0) {
-      toast.warning("Please select at least one goal before saving.");
-      return;
-    }
-    if (!user) {
-      toast.info(
-        "Your goals are saved for this session only. Sign in to keep them for future visits.",
-      );
-    } else {
-      toast.success("Goals saved!");
-    }
-    saveSection("goals");
-    scrollToNextSection("goals");
-  };
+  // Auto-save goals on every selection change
+  const goalsAutoSaveRef = useRef(false);
+  useEffect(() => {
+    if (!goalsAutoSaveRef.current) { goalsAutoSaveRef.current = true; return; }
+    if (selectedGoals.length > 0) saveSection("goals");
+  }, [selectedGoals, saveSection]);
 
   // Shared pill class (used for both the invisible measurement layer and real pills)
   const pillBaseClass =
-    "inline-flex flex-shrink-0 items-center gap-1.5 rounded-full border px-4 py-1.5 text-sm font-medium whitespace-nowrap";
+    "inline-flex flex-shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap";
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <section id="goals" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-
-        {/* ── Title row ── */}
-        <div className="flex items-center gap-4 mb-3 flex-wrap">
-          <h2
-            className="font-heading text-foreground text-3xl flex-shrink-0 cursor-default"
-            title="What goal is most important to you?"
-          >
-            Goals
-          </h2>
-
-          {selectedGoals.length > 0 && (
-            <>
-              <div className="flex flex-wrap items-center gap-2 flex-1">
-                {selectedGoals.map((goal) => (
-                  <span
-                    key={goal.id}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+    <div id="goals">
+        {/* ── Selected goals + Save ── */}
+        {selectedGoals.length > 0 && (
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedGoals.map((goal) => (
+                <span
+                  key={goal.id}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+                >
+                  {goal.display_name}
+                  <button
+                    onClick={() =>
+                      setSelectedGoals(selectedGoals.filter((g) => g.id !== goal.id))
+                    }
+                    className="rounded-full p-0.5 hover:bg-primary/20 transition-colors"
+                    aria-label={`Remove ${goal.display_name}`}
                   >
-                    {goal.display_name}
-                    <button
-                      onClick={() =>
-                        setSelectedGoals(selectedGoals.filter((g) => g.id !== goal.id))
-                      }
-                      className="rounded-full p-0.5 hover:bg-primary/20 transition-colors"
-                      aria-label={`Remove ${goal.display_name}`}
-                    >
-                      <X size={12} strokeWidth={2.5} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <button
-                onClick={handleSaveGoals}
-                className="flex-shrink-0 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                Save Goals
-              </button>
-            </>
-          )}
-        </div>
+                    <X size={12} strokeWidth={2.5} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Category tab bar ── */}
-        <div className="inline-flex overflow-x-auto scrollbar-hide border-b border-border">
-          {GOAL_CATEGORIES.map((cat) => {
-            const Icon = cat.icon;
-            const isActive = activeCategory === cat.node_name;
-            return (
-              <button
-                key={cat.node_name}
-                onClick={() => handleCategoryChange(cat.node_name)}
-                className={`flex items-center gap-2 px-5 py-1.5 text-sm whitespace-nowrap transition-colors flex-shrink-0
-                  ${isActive
-                    ? "bg-[#22A68C] text-white font-semibold"
-                    : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/40"
-                  }`}
-              >
-                <Icon
-                  size={16}
-                  className={`flex-shrink-0 ${isActive ? "text-white" : "text-[#22A68C]"}`}
-                />
-                {cat.label}
-              </button>
-            );
-          })}
-        </div>
+        <TooltipProvider delayDuration={200}>
+          <div className="flex flex-wrap border-b border-border">
+            {GOAL_CATEGORIES.map((cat) => {
+              const Icon = cat.icon;
+              const isActive = activeCategory === cat.node_name;
+              const btn = (
+                <button
+                  key={cat.node_name}
+                  onClick={() => handleCategoryChange(cat.node_name)}
+                  className={`flex items-center gap-1.5 py-1.5 text-sm whitespace-nowrap transition-colors flex-shrink-0
+                    ${isActive
+                      ? "bg-[#22A68C] text-white font-semibold px-3"
+                      : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/40 px-2.5"
+                    }`}
+                >
+                  <Icon
+                    size={16}
+                    className={`flex-shrink-0 ${isActive ? "text-white" : "text-[#22A68C]"}`}
+                  />
+                  {isActive && cat.label}
+                </button>
+              );
+
+              if (isActive) return btn;
+
+              return (
+                <Tooltip key={cat.node_name}>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent><p>{cat.label}</p></TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </TooltipProvider>
 
         {/* ── Goal pills ── */}
         <div className="pt-2 pb-1">
@@ -258,63 +236,76 @@ export default function GoalsSection() {
             /* Outer container — measured for available width */
             <div ref={pillsOuterRef} className="relative">
 
-              {/* ── Invisible measurement layer (position: absolute, out of flow) ── */}
-              {!rowExpanded && (
-                <div
-                  ref={measureRef}
-                  aria-hidden
-                  className="absolute top-0 left-0 flex flex-nowrap gap-2 pointer-events-none"
-                  style={{ visibility: "hidden" }}
-                >
-                  {currentGoals.map((goal) => (
-                    <span key={goal.id} className={pillBaseClass}>
-                      {goal.display_name}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* ── Invisible measurement layer (always rendered for line-count calculation) ── */}
+              <div
+                ref={measureRef}
+                aria-hidden
+                className="absolute top-0 left-0 flex flex-nowrap gap-2 pointer-events-none"
+                style={{ visibility: "hidden" }}
+              >
+                {currentGoals.map((goal) => (
+                  <span key={goal.id} className={pillBaseClass}>
+                    {goal.display_name}
+                  </span>
+                ))}
+              </div>
 
               {/* ── Visible pills + More / Less inline ── */}
               <div className={`flex items-center gap-2 ${rowExpanded ? "flex-wrap" : "flex-nowrap"}`}>
-                {(rowExpanded ? currentGoals : currentGoals.slice(0, visibleCount)).map((goal) => {
+                {(rowExpanded ? currentGoals : currentGoals.slice(0, visibleCount)).map((goal, idx) => {
                   const selected = isSelected(goal.id);
                   return (
-                    <button
-                      key={goal.id}
-                      type="button"
-                      onClick={() => toggleGoal(goal)}
-                      className={`${pillBaseClass} transition-colors
-                        ${selected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-foreground hover:border-primary/50 hover:text-foreground"
-                        }`}
-                    >
-                      {selected && <Check size={12} strokeWidth={3} className="flex-shrink-0" />}
-                      {goal.display_name}
-                    </button>
+                    <React.Fragment key={goal.id}>
+                      <button
+                        type="button"
+                        onClick={() => toggleGoal(goal)}
+                        className={`${pillBaseClass} transition-colors
+                          ${selected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border text-foreground hover:border-primary/50 hover:text-foreground"
+                          }`}
+                      >
+                        {selected && <Check size={12} strokeWidth={3} className="flex-shrink-0" />}
+                        {goal.display_name}
+                      </button>
+
+                      {/* Collapse arrow after first line of pills */}
+                      {rowExpanded && idx === visibleCount - 1 && visibleCount < currentGoals.length && (
+                        <button
+                          type="button"
+                          onClick={() => setRowExpanded(false)}
+                          className="flex-shrink-0 text-primary hover:text-primary/70 transition-colors"
+                          aria-label="Show fewer goals"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                      )}
+                    </React.Fragment>
                   );
                 })}
 
-                {/* More — right after the last visible pill */}
+                {/* More — downward arrow after last visible pill */}
                 {!rowExpanded && pillsOverflow && (
                   <button
                     ref={moreRef}
                     type="button"
                     onClick={() => setRowExpanded(true)}
-                    className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors -ml-1"
+                    className="flex-shrink-0 text-primary hover:text-primary/70 transition-colors -ml-1"
+                    aria-label="Show more goals"
                   >
-                    More
+                    <ChevronDown size={18} />
                   </button>
                 )}
 
-                {/* Less — right after the last pill when expanded */}
-                {rowExpanded && (
+                {/* Less — upward arrow at end of all pills */}
+                {rowExpanded && currentGoals.length > 0 && (
                   <button
                     type="button"
                     onClick={() => setRowExpanded(false)}
-                    className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors -ml-1"
+                    className="flex-shrink-0 text-primary hover:text-primary/70 transition-colors ml-auto"
+                    aria-label="Show fewer goals"
                   >
-                    Less
+                    <ChevronUp size={18} />
                   </button>
                 )}
               </div>
@@ -322,7 +313,6 @@ export default function GoalsSection() {
           )}
         </div>
 
-      </div>
-    </section>
+    </div>
   );
 }

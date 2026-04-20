@@ -32,7 +32,6 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
     }
   };
 
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [popupIndex, setPopupIndex] = useState<number | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -57,7 +56,7 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
 
   return (
     <div
-      className={`rounded-xl border p-4 transition-colors ${
+      className={`rounded-xl border p-4 transition-colors h-full flex flex-col ${
         allInCart
           ? "bg-[#E3EFE9] border-[#22A68C]"
           : "bg-card border-border hover:border-primary/40"
@@ -128,7 +127,6 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
       <div className="mt-3 space-y-2.5">
         {products.map((p, i) => {
           const cps = (p.costUsd / p.servingsPerContainer).toFixed(2);
-          const titleExpanded = expandedIndex === i;
           return (
             <div key={p.id} className="flex items-start gap-2">
               <span className="text-xs text-muted-foreground w-4 flex-shrink-0 mt-0.5">
@@ -137,10 +135,8 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <p
-                    onClick={() => setExpandedIndex(titleExpanded ? null : i)}
-                    className={`text-sm font-medium text-foreground leading-snug min-h-[2.5rem] cursor-pointer select-none ${
-                      titleExpanded ? "" : "line-clamp-2"
-                    }`}
+                    className="text-sm font-medium text-foreground leading-snug truncate"
+                    title={p.productName}
                   >
                     {p.productName}
                   </p>
@@ -183,21 +179,23 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
       </div>
 
       {/* Nutrient pills */}
-      {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {allNutrients.map(({ id, matched }) => (
-            <NutrientMatchPill
-              key={id}
-              label={nutrientNames.get(id) ?? id}
-              matched={matched}
-              tooltip={nutrientDescriptions.get(id)}
-            />
-          ))}
-          <ExtraIngredientsPill names={extraIngredientNames} />
-        </div>
-      )}
+      <div className="mt-3 flex-1">
+        {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
+          <div className="flex flex-wrap gap-1.5">
+            {allNutrients.map(({ id, matched }) => (
+              <NutrientMatchPill
+                key={id}
+                label={nutrientNames.get(id) ?? id}
+                matched={matched}
+                tooltip={nutrientDescriptions.get(id)}
+              />
+            ))}
+            <ExtraIngredientsPill names={extraIngredientNames} />
+          </div>
+        )}
+      </div>
 
-      {/* Single bundle cart control */}
+      {/* Single bundle cart control — pushed to bottom */}
       <div className="mt-3 pt-3 border-t border-border">
         {allInCart ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 border border-primary/30 px-2.5 py-0.5 text-xs font-semibold text-primary">

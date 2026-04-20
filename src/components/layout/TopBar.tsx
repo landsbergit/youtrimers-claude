@@ -100,7 +100,8 @@ const TopBar = () => {
             className="flex items-center gap-2.5"
           >
             <img src={logo} alt="Youtrimers logo" className="h-9 w-9" />
-            <span className="font-heading text-xl font-bold text-foreground">Youtrimers</span>
+            <span className="font-heading text-xl font-bold text-foreground">Youtrients</span>
+            <span className="hidden sm:inline text-xs text-muted-foreground ml-3">Personalized supplements at off-the-shelf prices</span>
           </a>
 
           {/* ── Desktop Nav ─────────────────────────────────────────────── */}

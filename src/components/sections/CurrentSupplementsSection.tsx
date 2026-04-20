@@ -27,12 +27,14 @@ export default function CurrentSupplementsSection() {
   };
 
   return (
-    <section id="supplements" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="supplements" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <h2 className="font-heading text-foreground text-3xl mb-1">Review</h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Add supplements you are currently taking so we can account for them in your recommendations.
-        </p>
+        <h2
+          className="font-heading text-foreground text-3xl mb-3 cursor-default"
+          title="Add supplements you are currently taking so we can account for them in your recommendations."
+        >
+          Review
+        </h2>
 
         <div className="max-w-xl space-y-6">
           {/* Search bar */}

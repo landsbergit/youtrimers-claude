@@ -34,35 +34,7 @@ const HOTSPOTS: HotspotDef[] = [
   { nodeId: "c54afbcc-18ff-48c7-a0b9-6ffa8560a96c", label: "Urinary",          cx: 210, cy: 281, labelSide: "left"  },
 ];
 
-// ── SVG Body silhouette ───────────────────────────────────────────────────────
-// viewBox 0 0 420 488. Gender-neutral front-facing silhouette.
-
-function BodySilhouette() {
-  return (
-    <g className="fill-muted/50 stroke-border" style={{ strokeWidth: 1.5 }}>
-      {/* Head */}
-      <ellipse cx="210" cy="52" rx="40" ry="45" />
-      {/* Neck */}
-      <rect x="196" y="94" width="28" height="26" rx="3" />
-      {/* Torso */}
-      <path d="M 112 118 Q 88 130 85 178 L 83 308 L 337 308 L 335 178 Q 332 130 308 118 Z" />
-      {/* Left arm */}
-      <path d="M 112 118 L 72 124 L 24 224 L 40 230 L 84 140 L 110 134 Z" />
-      {/* Right arm */}
-      <path d="M 308 118 L 348 124 L 396 224 L 380 230 L 336 140 L 310 134 Z" />
-      {/* Pelvis / hips */}
-      <path d="M 83 308 Q 78 334 94 344 L 210 342 L 326 344 Q 342 334 337 308 Z" />
-      {/* Left leg */}
-      <path d="M 94 342 L 88 462 L 162 462 L 158 342 Z" />
-      {/* Right leg */}
-      <path d="M 258 342 L 262 462 L 332 462 L 326 342 Z" />
-      {/* Left foot */}
-      <ellipse cx="125" cy="468" rx="40" ry="11" />
-      {/* Right foot */}
-      <ellipse cx="295" cy="468" rx="40" ry="11" />
-    </g>
-  );
-}
+// Body silhouette is now an external PNG image (public/body-silhouette.png).
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -126,16 +98,15 @@ export function BodyMap({ groups, selected, onToggle, onClose }: BodyMapProps) {
         className="relative"
         style={{ width: W, height: H }}
       >
-        {/* Body silhouette SVG */}
-        <svg
-          viewBox="0 0 420 488"
+        {/* Body silhouette image */}
+        <img
+          src="/body-silhouette.png"
+          alt=""
           width={W}
           height={H}
-          className="absolute inset-0"
-          style={{ overflow: "visible" }}
-        >
-          <BodySilhouette />
-        </svg>
+          className="absolute inset-0 object-contain opacity-40 pointer-events-none"
+          draggable={false}
+        />
 
         {/* Hotspot markers + labels */}
         {visibleHotspots.map((hotspot) => {

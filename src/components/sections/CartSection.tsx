@@ -5,12 +5,14 @@ export default function CartSection() {
   const { items, totalCost, itemCount } = useCart();
 
   return (
-    <section id="cart" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="cart" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <h2 className="font-heading text-foreground text-3xl mb-1">Shopping Cart</h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Products you've selected from your matches.
-        </p>
+        <h2
+          className="font-heading text-foreground text-3xl mb-3 cursor-default"
+          title="Products you've selected from your matches."
+        >
+          Shopping Cart
+        </h2>
 
         {items.length === 0 ? (
           <EmptyCart />

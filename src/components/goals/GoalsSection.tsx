@@ -148,8 +148,13 @@ export default function GoalsSection() {
       toast.warning(`You can choose up to ${MAX_SELECTED_GOALS} goals at a time.`);
       return;
     }
-    setSelectedGoals([...selectedGoals, goal]);
-    toast.info("We recommend focusing on 1 or 2 goals at a time. You can choose up to 3 goals.");
+    const updated = [...selectedGoals, goal];
+    setSelectedGoals(updated);
+    if (updated.length >= MAX_SELECTED_GOALS) {
+      toast.info(`You've reached the maximum of ${MAX_SELECTED_GOALS} goals.`, { duration: 8000 });
+    } else {
+      toast.info(`For best results, focus on a single goal. You can select up to ${MAX_SELECTED_GOALS}.`);
+    }
   };
 
   const handleSaveGoals = () => {
@@ -175,18 +180,19 @@ export default function GoalsSection() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <section id="goals" className="px-4 pt-12 pb-6 sm:px-6 lg:px-8">
+    <section id="goals" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
 
         {/* ── Title row ── */}
-        <div className="flex items-center gap-4 mb-4 flex-wrap">
-          <h2 className="font-heading text-foreground text-3xl flex-shrink-0">Goals</h2>
+        <div className="flex items-center gap-4 mb-3 flex-wrap">
+          <h2
+            className="font-heading text-foreground text-3xl flex-shrink-0 cursor-default"
+            title="What goal is most important to you?"
+          >
+            Goals
+          </h2>
 
-          {selectedGoals.length === 0 ? (
-            <p className="text-muted-foreground text-base">
-              What goal is most important to you?
-            </p>
-          ) : (
+          {selectedGoals.length > 0 && (
             <>
               <div className="flex flex-wrap items-center gap-2 flex-1">
                 {selectedGoals.map((goal) => (
@@ -226,7 +232,7 @@ export default function GoalsSection() {
               <button
                 key={cat.node_name}
                 onClick={() => handleCategoryChange(cat.node_name)}
-                className={`flex items-center gap-2 px-5 py-3 text-sm whitespace-nowrap transition-colors flex-shrink-0
+                className={`flex items-center gap-2 px-5 py-1.5 text-sm whitespace-nowrap transition-colors flex-shrink-0
                   ${isActive
                     ? "bg-[#22A68C] text-white font-semibold"
                     : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/40"
@@ -243,76 +249,75 @@ export default function GoalsSection() {
         </div>
 
         {/* ── Goal pills ── */}
-        <div className="pt-4 pb-2">
+        <div className="pt-2 pb-1">
           {loading ? (
             <div className="h-9 w-2/3 rounded-full bg-muted animate-pulse" />
           ) : currentGoals.length === 0 ? (
             <p className="text-sm text-muted-foreground italic">Coming soon</p>
           ) : (
-            <div className="flex items-start gap-2">
+            /* Outer container — measured for available width */
+            <div ref={pillsOuterRef} className="relative">
 
-              {/* Outer container — measured for available width */}
-              <div ref={pillsOuterRef} className="relative flex-1 min-w-0">
+              {/* ── Invisible measurement layer (position: absolute, out of flow) ── */}
+              {!rowExpanded && (
+                <div
+                  ref={measureRef}
+                  aria-hidden
+                  className="absolute top-0 left-0 flex flex-nowrap gap-2 pointer-events-none"
+                  style={{ visibility: "hidden" }}
+                >
+                  {currentGoals.map((goal) => (
+                    <span key={goal.id} className={pillBaseClass}>
+                      {goal.display_name}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-                {/* ── Invisible measurement layer (position: absolute, out of flow) ── */}
-                {!rowExpanded && (
-                  <div
-                    ref={measureRef}
-                    aria-hidden
-                    className="absolute top-0 left-0 flex flex-nowrap gap-2 pointer-events-none"
-                    style={{ visibility: "hidden" }}
+              {/* ── Visible pills + More / Less inline ── */}
+              <div className={`flex items-center gap-2 ${rowExpanded ? "flex-wrap" : "flex-nowrap"}`}>
+                {(rowExpanded ? currentGoals : currentGoals.slice(0, visibleCount)).map((goal) => {
+                  const selected = isSelected(goal.id);
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      onClick={() => toggleGoal(goal)}
+                      className={`${pillBaseClass} transition-colors
+                        ${selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border text-foreground hover:border-primary/50 hover:text-foreground"
+                        }`}
+                    >
+                      {selected && <Check size={12} strokeWidth={3} className="flex-shrink-0" />}
+                      {goal.display_name}
+                    </button>
+                  );
+                })}
+
+                {/* More — right after the last visible pill */}
+                {!rowExpanded && pillsOverflow && (
+                  <button
+                    ref={moreRef}
+                    type="button"
+                    onClick={() => setRowExpanded(true)}
+                    className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors -ml-1"
                   >
-                    {currentGoals.map((goal) => (
-                      <span key={goal.id} className={pillBaseClass}>
-                        {goal.display_name}
-                      </span>
-                    ))}
-                  </div>
+                    More
+                  </button>
                 )}
 
-                {/* ── Visible pills ── */}
-                <div className={`flex gap-2 ${rowExpanded ? "flex-wrap" : "flex-nowrap"}`}>
-                  {(rowExpanded ? currentGoals : currentGoals.slice(0, visibleCount)).map((goal) => {
-                    const selected = isSelected(goal.id);
-                    return (
-                      <button
-                        key={goal.id}
-                        type="button"
-                        onClick={() => toggleGoal(goal)}
-                        className={`${pillBaseClass} transition-colors
-                          ${selected
-                            ? "border-primary bg-primary text-primary-foreground"
-                            : "border-border text-foreground hover:border-primary/50 hover:text-foreground"
-                          }`}
-                      >
-                        {selected && <Check size={12} strokeWidth={3} className="flex-shrink-0" />}
-                        {goal.display_name}
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Less — right after the last pill when expanded */}
+                {rowExpanded && (
+                  <button
+                    type="button"
+                    onClick={() => setRowExpanded(false)}
+                    className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors -ml-1"
+                  >
+                    Less
+                  </button>
+                )}
               </div>
-
-              {/* More / Less */}
-              {!rowExpanded && pillsOverflow && (
-                <button
-                  ref={moreRef}
-                  type="button"
-                  onClick={() => setRowExpanded(true)}
-                  className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors pt-1.5"
-                >
-                  More
-                </button>
-              )}
-              {rowExpanded && (
-                <button
-                  type="button"
-                  onClick={() => setRowExpanded(false)}
-                  className="flex-shrink-0 text-sm font-medium text-primary hover:underline underline-offset-2 transition-colors pt-1.5"
-                >
-                  Less
-                </button>
-              )}
             </div>
           )}
         </div>

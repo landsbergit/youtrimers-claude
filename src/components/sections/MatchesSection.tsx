@@ -28,7 +28,6 @@ export default function MatchesSection() {
     goalIds,
     qualityWeight,
     maxBundleSize,
-    setMaxBundleSize,
     diversityWeight,
     setDiversityWeight,
     savedSections,
@@ -103,20 +102,19 @@ export default function MatchesSection() {
   const allSectionsSaved = PERSONALIZE_SECTION_ORDER.every((s) => savedSections.has(s));
 
   return (
-    <section id="matches" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="matches" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-          <div>
-            <h2 className="font-heading text-foreground text-3xl mb-1">Matches</h2>
-            <p className="text-muted-foreground text-base">
-              Supplements matched to your personal profile.
-            </p>
-          </div>
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-3">
+          <h2
+            className="font-heading text-foreground text-3xl cursor-default"
+            title="Supplements matched to your personal profile."
+          >
+            Matches
+          </h2>
 
           {/* Controls row */}
           <div className="flex flex-wrap items-end gap-3">
             <DiversityControl value={diversityWeight} onChange={setDiversityWeight} />
-            <BundleSizeControl value={maxBundleSize} onChange={setMaxBundleSize} />
           </div>
         </div>
 
@@ -249,7 +247,7 @@ function DiversityControl({
               type="button"
               title={opt.title}
               onClick={() => onChange(opt.value)}
-              className={`px-3 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border whitespace-nowrap ${
+              className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border whitespace-nowrap ${
                 value === opt.value
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -260,45 +258,6 @@ function DiversityControl({
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Bundle size control ────────────────────────────────────────────────────────
-
-const BUNDLE_OPTIONS: { value: number; label: string; title: string }[] = [
-  { value: 1, label: "1", title: "Single products only" },
-  { value: 2, label: "2", title: "Pairs of products" },
-  { value: 3, label: "3", title: "Up to 3 products" },
-];
-
-function BundleSizeControl({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-}) {
-  return (
-    <div className="flex flex-col items-end gap-1">
-      <span className="text-xs text-muted-foreground">Combine up to</span>
-      <div className="flex items-center rounded-lg border border-border overflow-hidden">
-        {BUNDLE_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            title={opt.title}
-            onClick={() => onChange(opt.value)}
-            className={`px-3.5 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border ${
-              value === opt.value
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

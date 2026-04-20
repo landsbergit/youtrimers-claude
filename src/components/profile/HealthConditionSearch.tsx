@@ -9,6 +9,7 @@ interface HealthConditionSearchProps {
   onAdd: (condition: SelectedCondition) => void;
   onRemove: (id: string) => void;
   isLoading?: boolean;
+  actionSlot?: React.ReactNode;
 }
 
 const MAX_SUGGESTIONS = 10;
@@ -19,6 +20,7 @@ export function HealthConditionSearch({
   onAdd,
   onRemove,
   isLoading,
+  actionSlot,
 }: HealthConditionSearchProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -128,6 +130,11 @@ export function HealthConditionSearch({
             >
               <X size={14} />
             </button>
+          )}
+          {actionSlot && (
+            <span className="flex-shrink-0 border-l border-border pl-2 ml-1">
+              {actionSlot}
+            </span>
           )}
         </div>
 

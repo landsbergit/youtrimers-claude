@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { Info } from "lucide-react";
 import { useRecommendationContext } from "@/context/RecommendationContext";
-import { useToast } from "@/hooks/use-toast";
 
 // The three discrete positions and their qualityWeight values
 const DISCRETE_OPTIONS = [
@@ -64,124 +63,103 @@ function TooltipLabel({ text, tooltip }: { text: string; tooltip: string }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ApproachSection() {
-  const { qualityWeight, setQualityWeight, saveSection, scrollToNextSection } =
-    useRecommendationContext();
-  const { toast } = useToast();
+  const { qualityWeight, setQualityWeight, saveSection } = useRecommendationContext();
 
   const [isPrecise, setIsPrecise] = useState(false);
 
   const handleDiscreteSelect = (value: number) => {
     setQualityWeight(value);
+    saveSection("approach");
   };
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setQualityWeight(Number(e.target.value) / 100);
+    saveSection("approach");
   };
 
   const switchToPrecise = () => setIsPrecise(true);
 
   const switchToDiscrete = () => {
-    // Snap to nearest discrete option when collapsing
     setQualityWeight(snapToDiscrete(qualityWeight));
     setIsPrecise(false);
-  };
-
-  const handleSave = () => {
-    saveSection("approach");
-    toast({ title: "Approach saved", description: "Matches updated with your preference." });
-    scrollToNextSection("approach");
   };
 
   const activeDiscrete = DISCRETE_OPTIONS.find((o) => o.value === qualityWeight);
 
   return (
-    <section id="approach" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="approach" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <h2 className="font-heading text-foreground text-3xl mb-1">Approach</h2>
-        <p className="text-muted-foreground text-base mb-10">
-          Choose how to balance price and supplement quality when ranking matches.
-        </p>
+        <h2
+          className="font-heading text-foreground text-3xl mb-3 cursor-default"
+          title="Choose how to balance price and supplement quality when ranking matches."
+        >
+          Approach
+        </h2>
 
-        <div className="max-w-xl rounded-xl border border-border bg-card p-6">
-          <p className="text-sm font-medium text-foreground mb-6">
-            Price vs. Quality balance
-          </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="text-sm font-semibold text-foreground whitespace-nowrap">Sort Products by Price and Quality</span>
 
-          {/* Control row */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <TooltipLabel text="Price" tooltip={PRICE_TOOLTIP} />
+          <TooltipLabel text="Price" tooltip={PRICE_TOOLTIP} />
 
-            {isPrecise ? (
-              /* ── Continuous slider ── */
-              <div className="flex-1 min-w-[140px]">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={Math.round(qualityWeight * 100)}
-                  onChange={handleSliderChange}
-                  className="w-full accent-primary cursor-pointer"
-                />
-              </div>
-            ) : (
-              /* ── Discrete 3-button control ── */
-              <div className="flex rounded-lg border border-border overflow-hidden">
-                {DISCRETE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.label}
-                    type="button"
-                    onClick={() => handleDiscreteSelect(opt.value)}
-                    className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border ${
-                      qualityWeight === opt.value
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <TooltipLabel text="Quality" tooltip={QUALITY_TOOLTIP} />
-
-            {/* Precision toggle */}
-            {isPrecise ? (
-              <button
-                type="button"
-                onClick={switchToDiscrete}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 whitespace-nowrap"
-              >
-                Less precision
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={switchToPrecise}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 whitespace-nowrap"
-              >
-                More precision
-              </button>
-            )}
-          </div>
-
-          {/* Current value hint in precise mode */}
-          {isPrecise && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {Math.round(qualityWeight * 100)}% quality
-              {activeDiscrete ? ` · ${activeDiscrete.label}` : ""}
-            </p>
+          {isPrecise ? (
+            /* ── Continuous slider ── */
+            <div className="flex-1 min-w-[140px]">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={Math.round(qualityWeight * 100)}
+                onChange={handleSliderChange}
+                className="w-full accent-primary cursor-pointer"
+              />
+            </div>
+          ) : (
+            /* ── Discrete 3-button control ── */
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {DISCRETE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => handleDiscreteSelect(opt.value)}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border ${
+                    qualityWeight === opt.value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           )}
 
-          {/* Save */}
-          <button
-            type="button"
-            onClick={handleSave}
-            className="mt-8 px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Save Approach
-          </button>
+          <TooltipLabel text="Quality" tooltip={QUALITY_TOOLTIP} />
+
+          {isPrecise ? (
+            <button
+              type="button"
+              onClick={switchToDiscrete}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 whitespace-nowrap"
+            >
+              Less precision
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={switchToPrecise}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2 whitespace-nowrap"
+            >
+              More precision
+            </button>
+          )}
+
+          {isPrecise && (
+            <span className="text-xs text-muted-foreground">
+              {Math.round(qualityWeight * 100)}% quality
+              {activeDiscrete ? ` · ${activeDiscrete.label}` : ""}
+            </span>
+          )}
         </div>
       </div>
     </section>

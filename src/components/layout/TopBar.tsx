@@ -131,10 +131,10 @@ const TopBar = () => {
 
                 {/* Mega menu — stays in the hover zone via pt-1 bridge */}
                 {megaOpen && (
-                  <div className="absolute left-0 top-full pt-1 z-50">
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full pt-1 z-50">
                     <div
                       className="flex rounded-xl border border-border bg-popover shadow-lg overflow-hidden"
-                      style={{ width: "min(640px, calc(100vw - 2rem))" }}
+                      style={{ width: "min(480px, calc(100vw - 2rem))" }}
                     >
                       {PERSONALIZE_ITEMS.map((item) => {
                         const isActive = activeSection === item.href.slice(1);

@@ -6,7 +6,9 @@
       "Bash(powershell -Command \"\\(Get-ChildItem 'C:\\\\Users\\\\User\\\\dataPrep_iHerb\\\\iHerb_images' -Recurse | Measure-Object -Property Length -Sum\\).Sum / 1MB\")",
       "Read(//c/Users/User/Documents/NUTRIMERS_2026/iHerb_ProuctData/**)",
       "Bash(npx tsc:*)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(python \"C:/Users/User/dataPrep_iHerb/pages_directory/check_tags.py\")",
+      "Bash(python -c ':*)"
     ]
   }
 }

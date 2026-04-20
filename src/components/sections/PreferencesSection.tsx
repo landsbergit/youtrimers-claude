@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, AlertCircle } from "lucide-react";
+import { Droplets, LeafyGreen, HandHeart, Package } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRecommendationContext } from "@/context/RecommendationContext";
 import {
   useDosageFormTree,
@@ -179,6 +180,8 @@ export default function PreferencesSection() {
     dosageFormPreferencesSaved,
     setDosageFormPreferencesSaved,
     setReligiousPreferences,
+    maxBundleSize,
+    setMaxBundleSize,
     saveSection,
   } = useRecommendationContext();
 
@@ -194,13 +197,23 @@ export default function PreferencesSection() {
     preferences: religiousSelected,
     togglePreference: toggleReligious,
     savePreferences: saveReligiousPreferences,
-    saving: savingReligious,
   } = useMemberReligiousPreferences();
 
   // Keep context in sync whenever the hook's state changes (including Supabase load on login)
   useEffect(() => {
     setReligiousPreferences(religiousSelected.map((p) => p.nodeName));
   }, [religiousSelected, setReligiousPreferences]);
+
+  // Auto-save religious preferences when they change (debounced)
+  const religiousAutoSaveRef = useRef(false);
+  useEffect(() => {
+    if (!religiousAutoSaveRef.current) { religiousAutoSaveRef.current = true; return; }
+    const t = setTimeout(() => {
+      saveReligiousPreferences();
+      saveSection("preferences");
+    }, 800);
+    return () => clearTimeout(t);
+  }, [saveReligiousPreferences, saveSection]);
 
   // Dosage form selection (persisted via context → localStorage)
   const [selected, setSelected] = useState<string[]>(acceptedDosageFormNames);
@@ -211,9 +224,6 @@ export default function PreferencesSection() {
     try { return JSON.parse(localStorage.getItem(LS_FOOD_PREFS) ?? "[]"); }
     catch { return []; }
   });
-
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Auto-set dosage form defaults when age changes (only before explicit save)
   useEffect(() => {
@@ -228,53 +238,41 @@ export default function PreferencesSection() {
 
   const selectedSet = new Set(selected);
 
+  // Toggle a single leaf and auto-save immediately
   const toggleLeaf = useCallback((nodeName: string) => {
-    setSelected((prev) =>
-      prev.includes(nodeName) ? prev.filter((n) => n !== nodeName) : [...prev, nodeName],
-    );
-  }, []);
-
-  const toggleCategory = useCallback(
-    (category: DosageFormCategory) => {
-      const leafNames = category.selfLeaf
-        ? [category.selfLeaf.nodeName]
-        : category.leaves.map((l) => l.nodeName);
-      const selectedCount = leafNames.filter((n) => selectedSet.has(n)).length;
-      if (selectedCount < leafNames.length / 2) {
-        setSelected((prev) => [...new Set([...prev, ...leafNames])]);
-      } else {
-        setSelected((prev) => prev.filter((n) => !leafNames.includes(n)));
-      }
-    },
-    [selectedSet],
-  );
-
-  const toggleFood = useCallback((nodeName: string) => {
-    setSelectedFood((prev) =>
-      prev.includes(nodeName) ? prev.filter((n) => n !== nodeName) : [...prev, nodeName],
-    );
-  }, []);
-
-  const handleSave = async () => {
-    if (selected.length === 0) {
-      setSaveError("Please select at least one dosage form.");
-      return;
-    }
-    setSaveError(null);
-    setAcceptedDosageFormNames(selected);
+    const next = selected.includes(nodeName)
+      ? selected.filter((n) => n !== nodeName)
+      : [...selected, nodeName];
+    setSelected(next);
+    setAcceptedDosageFormNames(next);
     setDosageFormPreferencesSaved(true);
-    localStorage.setItem(LS_FOOD_PREFS, JSON.stringify(selectedFood));
-
-    const { error } = await saveReligiousPreferences();
-    if (error) {
-      setSaveError("Failed to save religious preferences. Please try again.");
-      return;
-    }
-
     saveSection("preferences");
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
-  };
+  }, [selected, setAcceptedDosageFormNames, setDosageFormPreferencesSaved, saveSection]);
+
+  // Toggle an entire category and auto-save immediately
+  const toggleCategory = useCallback((category: DosageFormCategory) => {
+    const leafNames = category.selfLeaf
+      ? [category.selfLeaf.nodeName]
+      : category.leaves.map((l) => l.nodeName);
+    const selectedCount = leafNames.filter((n) => selectedSet.has(n)).length;
+    const next = selectedCount < leafNames.length / 2
+      ? [...new Set([...selected, ...leafNames])]
+      : selected.filter((n) => !leafNames.includes(n));
+    setSelected(next);
+    setAcceptedDosageFormNames(next);
+    setDosageFormPreferencesSaved(true);
+    saveSection("preferences");
+  }, [selected, selectedSet, setAcceptedDosageFormNames, setDosageFormPreferencesSaved, saveSection]);
+
+  // Toggle a food preference and auto-save to localStorage
+  const toggleFood = useCallback((nodeName: string) => {
+    const next = selectedFood.includes(nodeName)
+      ? selectedFood.filter((n) => n !== nodeName)
+      : [...selectedFood, nodeName];
+    setSelectedFood(next);
+    localStorage.setItem(LS_FOOD_PREFS, JSON.stringify(next));
+    saveSection("preferences");
+  }, [selectedFood, saveSection]);
 
   const ageDescription = (() => {
     if (!birthYear || !birthMonth) return null;
@@ -287,24 +285,30 @@ export default function PreferencesSection() {
     return `${years} yr ${rem} mo old`;
   })();
 
-  const isLoading = loadingTree || loadingFood || loadingRestrictions || loadingReligious;
-
   return (
-    <section id="preferences" className="px-4 py-20 sm:px-6 lg:px-8">
+    <section id="preferences" className="px-4 pt-8 pb-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <h2 className="font-heading text-foreground text-3xl mb-1">Preferences</h2>
-        <p className="text-muted-foreground text-base mb-8">
-          Choose which supplement forms you can or prefer to take.
-        </p>
+        <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <h2 className="font-heading text-foreground text-3xl mb-3 cursor-default w-fit">
+              Preferences
+            </h2>
+          </TooltipTrigger>
+          <TooltipContent><p>Choose which supplement forms you can or prefer to take.</p></TooltipContent>
+        </Tooltip>
 
-        <div className="max-w-xl space-y-10">
+        <div className="max-w-xl space-y-6">
 
           {/* ── Dosage Forms ── */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-sm font-semibold text-foreground">
-                Dosage Forms
-              </label>
+              <div className="flex items-center gap-1.5">
+                <Droplets size={16} className="text-[#22A68C]" />
+                <label className="text-sm font-semibold text-foreground">
+                  Dosage Forms
+                </label>
+              </div>
               {!loadingTree && (
                 <button
                   type="button"
@@ -316,13 +320,16 @@ export default function PreferencesSection() {
               )}
             </div>
 
-            <p className="text-xs text-muted-foreground mb-3">
-              {dosageFormPreferencesSaved
-                ? "Your saved preferences are active. Age changes will not override them."
-                : ageDescription
-                ? `Defaults set for age: ${ageDescription}. Adjust and save to lock your preferences.`
-                : "Add your age in the Profile section to auto-fill age-appropriate defaults."}
-            </p>
+            {ageDescription && !dosageFormPreferencesSaved && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Defaults set for age: {ageDescription}. Adjust to lock your preferences.
+              </p>
+            )}
+            {!ageDescription && !dosageFormPreferencesSaved && (
+              <p className="text-xs text-muted-foreground mb-2">
+                Add your age in the Profile section to auto-fill age-appropriate defaults.
+              </p>
+            )}
 
             {loadingTree ? (
               <div className="space-y-2 animate-pulse">
@@ -367,55 +374,67 @@ export default function PreferencesSection() {
             )}
           </div>
 
+        </div>
+
+        <div className="space-y-6 mt-6">
+
           {/* ── Food Preferences ── */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-1">
-              Food &amp; Source Preferences
-            </label>
-            <p className="text-xs text-muted-foreground mb-3">
-              Filter for products labelled with these certifications or sourcing standards.
-            </p>
+          <div className="flex items-center gap-4 flex-wrap">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 cursor-default">
+                  <LeafyGreen size={16} className="text-[#22A68C]" />
+                  <label className="text-sm font-semibold text-foreground cursor-default">
+                    Food &amp; Source Preferences
+                  </label>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent><p>Filter for products labelled with these certifications or sourcing standards.</p></TooltipContent>
+            </Tooltip>
 
             {loadingFood || loadingRestrictions ? (
-              <div className="space-y-2 animate-pulse">
-                {[1, 2, 3].map((i) => <div key={i} className="h-5 w-32 rounded bg-muted" />)}
-              </div>
+              <>
+                {[1, 2, 3].map((i) => <div key={i} className="h-5 w-20 rounded bg-muted animate-pulse" />)}
+              </>
             ) : (
-              <div className="space-y-2">
-                {[...dietaryNodes, ...(foodNodes ?? [])].map((node) => (
-                  <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
-                    <input
-                      type="checkbox"
-                      checked={selectedFood.includes(node.nodeName)}
-                      onChange={() => toggleFood(node.nodeName)}
-                      className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
-                    />
-                    <span className="text-sm text-foreground group-hover:text-foreground/80">
-                      {node.displayName}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              [...dietaryNodes, ...(foodNodes ?? [])].map((node) => (
+                <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={selectedFood.includes(node.nodeName)}
+                    onChange={() => toggleFood(node.nodeName)}
+                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
+                  />
+                  <span className="text-sm text-foreground group-hover:text-foreground/80">
+                    {node.displayName}
+                  </span>
+                </label>
+              ))
             )}
           </div>
 
           {/* ── Religious Preferences ── */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-1">
-              Religious &amp; Dietary Certifications
-            </label>
-            <p className="text-xs text-muted-foreground mb-3">
-              Only show products carrying these certifications. Leave unchecked to see all products.
-            </p>
+          <div className="flex items-center gap-4 flex-wrap">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 cursor-default">
+                  <HandHeart size={16} className="text-[#22A68C]" />
+                  <label className="text-sm font-semibold text-foreground cursor-default">
+                    Religious Certifications
+                  </label>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent><p>Only show products carrying these certifications. Leave unchecked to see all products.</p></TooltipContent>
+            </Tooltip>
 
             {loadingReligious ? (
-              <div className="space-y-2 animate-pulse">
-                {[1, 2].map((i) => <div key={i} className="h-5 w-28 rounded bg-muted" />)}
+              <div className="flex gap-4 animate-pulse">
+                {[1, 2].map((i) => <div key={i} className="h-5 w-20 rounded bg-muted" />)}
               </div>
             ) : !religiousNodes || religiousNodes.length === 0 ? (
               <p className="text-sm text-muted-foreground">No options available.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="flex items-center gap-4">
                 {religiousNodes.map((node) => (
                   <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
                     <input
@@ -433,33 +452,37 @@ export default function PreferencesSection() {
             )}
           </div>
 
-          {/* ── Save button ── */}
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={isLoading || savingReligious}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
-            >
-              {savingReligious ? "Saving…" : "Save Preferences"}
-            </button>
-
-            {saved && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
-                <Check size={14} strokeWidth={3} />
-                Saved
-              </span>
-            )}
-
-            {saveError && (
-              <span className="inline-flex items-center gap-1.5 text-sm text-destructive">
-                <AlertCircle size={14} />
-                {saveError}
-              </span>
-            )}
+          {/* ── Product number ── */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 cursor-default">
+                  <Package size={16} className="text-[#22A68C]" />
+                  <span className="text-sm font-semibold text-foreground">Product number</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent><p>Combine up to 1–3 products</p></TooltipContent>
+            </Tooltip>
+            <div className="flex items-center rounded-lg border border-border overflow-hidden w-fit">
+              {([1, 2, 3] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => { setMaxBundleSize(n); saveSection("preferences"); }}
+                  className={`px-4 py-1.5 text-sm font-medium transition-colors border-r last:border-r-0 border-border ${
+                    maxBundleSize === n
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
           </div>
 
         </div>
+        </TooltipProvider>
       </div>
     </section>
   );

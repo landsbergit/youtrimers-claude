@@ -50,6 +50,7 @@ Underlying palette (for reference only — not used directly in code):
 - Transitions: `transition-colors` on all interactive elements
 - Pill tags (selected items): `border border-primary/30 bg-primary/10 text-primary px-3 py-1 rounded-full`
 - Section layout: `px-4 py-20 sm:px-6 lg:px-8` with `mx-auto max-w-7xl` inside
+- Toast duration: default (4 s) for standard messages; `{ duration: 8000 }` for important limit/warning messages (e.g. max goals reached)
 
 ---
 
@@ -301,6 +302,10 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 
 ### Data pipeline
 - Rebuild iHerb data extraction pipeline: minerals, non-vitamin nutrients, complete vitamin dose data (populates `product_ingredients.amount_per_serving` / `amount_unit` → unlocks dose-based scoring automatically)
+- **HTML entities in product names** — `&amp;` and `&#174;` (®) not decoded in `3A_extract.py`; fix with `html.unescape()` on extracted product name
+- **Low tag coverage** — product descriptions explicitly contain "Non GMO", "Gluten Free" etc. but only one tag matches per product; investigate whether TAGS ontology aliases cover non-hyphenated variants (e.g. "Non GMO" vs "Non-GMO") and whether `product_overview` is correctly reaching 7B's TAGS group
+- **VEGETERIAN typo** in ontology node name (should be VEGETARIAN) — fix in Supabase ontology table and in Ontology.yaml source file
+- **US-only products** — some iHerb products are geo-restricted and skipped during scraping from an Israeli IP; to capture them, connect Chrome to a US VPN before launching with `--remote-debugging-port=9222`, then run a targeted re-scrape of the missing product IDs
 
 ### Scoring & recommendations
 - Scoring Phase 2: quality_tier bonus in scoreProducts.ts
@@ -309,6 +314,9 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 
 ### UX & Content
 - **Explanation level selector** — let users choose how much detail they see (e.g. "Simple" / "Standard" / "Expert"). At the "Simple" level all copy should be plain language aimed at adults with no domain knowledge: no Latin names, no clinical jargon, short sentences. Applies to: nutrient tooltips, rule descriptions, product card explanations, and any other copy that currently assumes domain knowledge.
+
+### Accessibility & Legal
+- **Web accessibility (avoid legal risk)** — audit and implement WCAG 2.1 AA compliance before launch. Covers: keyboard navigation, screen reader support (ARIA labels), sufficient color contrast, focus indicators, alt text on images, and accessible form inputs. Required in both Israel (Equal Rights for Persons with Disabilities Law) and the US (ADA / Section 508).
 
 ### Maintenance
 - Delete test rule "test1" (needs service role key or SQL Editor)

@@ -40,8 +40,8 @@ export function NutrientMatchPill({ label, matched, tooltip }: NutrientMatchPill
           pointer-events-none
           absolute bottom-full left-1/2 -translate-x-1/2 mb-2
           z-50 w-56
-          rounded-lg border border-border bg-popover shadow-lg
-          px-3 py-2 text-xs text-popover-foreground leading-relaxed
+          rounded-xl border border-border bg-popover shadow-lg
+          px-4 py-2 text-sm text-popover-foreground leading-relaxed
           opacity-0 group-hover/pill:opacity-100
           transition-opacity duration-150
           whitespace-pre-line

@@ -66,6 +66,7 @@ function GenderIcon({ size = 16, className }: { size?: number; className?: strin
 export default function ProfileSection() {
   const {
     saveSection,
+    setFoodRestrictions: setContextFoodRestrictions,
     setGender: setContextGender,
     setReproductiveStatus: setContextReproductiveStatus,
     setBirthYear: setContextBirthYear,
@@ -97,7 +98,7 @@ export default function ProfileSection() {
     saveConditions,
   } = useMemberHealthConditions();
 
-  const [showBodyMap, setShowBodyMap] = useState(true);
+  const [showBodyMap, setShowBodyMap] = useState(false);
   const [reproDropdownOpen, setReproDropdownOpen] = useState(false);
   const [foodDropdownOpen, setFoodDropdownOpen] = useState(false);
 
@@ -331,7 +332,7 @@ export default function ProfileSection() {
       ? selectedRestrictions.filter((n) => n !== nodeName)
       : [...selectedRestrictions, nodeName];
     setSelectedRestrictions(next);
-    localStorage.setItem(LS_FOOD_RESTRICTIONS, JSON.stringify(next));
+    setContextFoodRestrictions(next);
     saveSection("profile");
   };
 

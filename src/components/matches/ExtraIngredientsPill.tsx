@@ -48,12 +48,12 @@ export function ExtraIngredientsPill({ names }: ExtraIngredientsPillProps) {
           onMouseLeave={hide}
           className="absolute bottom-full left-0 mb-2 z-50 w-56 rounded-xl border border-border bg-popover shadow-xl p-3"
         >
-          <p className="text-xs font-medium text-muted-foreground mb-2">
+          <p className="text-sm font-medium text-muted-foreground mb-2">
             Additional ingredients
           </p>
           <ul className="space-y-0.5 max-h-48 overflow-y-auto">
             {formatted.map((name, i) => (
-              <li key={i} className="text-xs text-foreground">
+              <li key={i} className="text-sm text-foreground">
                 {name}
               </li>
             ))}

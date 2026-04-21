@@ -5,7 +5,6 @@ import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { ProductCard } from "@/components/matches/ProductCard";
 import { BundleCard } from "@/components/matches/BundleCard";
 import { ProductCardSkeleton } from "@/components/matches/ProductCardSkeleton";
-import { MatchesEmptyState } from "@/components/matches/MatchesEmptyState";
 import { diversifyResults } from "@/lib/engine/diversifyResults";
 import { CheckCircle2, Circle, ChevronRight, AlertTriangle } from "lucide-react";
 
@@ -32,6 +31,8 @@ export default function MatchesSection() {
     diversityWeight,
     savedSections,
     acceptedDosageFormNames,
+    foodPreferences,
+    foodRestrictions,
     gender,
     reproductiveStatus,
     birthYear,
@@ -41,7 +42,6 @@ export default function MatchesSection() {
     heightCm,
     weightKg,
   } = useRecommendationContext();
-  const hasAnySection = savedSections.size > 0;
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
 
   const { data: result, isLoading: isRecommending } = useRecommendations({
@@ -54,12 +54,14 @@ export default function MatchesSection() {
     birthYear,
     birthMonth,
     religiousPreferences,
+    foodPreferences,
+    foodRestrictions,
     bodySize,
     heightCm,
     weightKg,
   });
 
-  // Preload the catalog while the user browses (non-blocking)
+  // Preload catalog
   useProductCatalog();
 
   // Build a display-name lookup from the consolidated requirements
@@ -95,9 +97,11 @@ export default function MatchesSection() {
   // lambda: 1 = Focused (pure relevance), 0 = Diverse. We invert diversityWeight so
   // that higher diversityWeight = more diversity = lower lambda.
   const lambda = 1 - diversityWeight;
+  const MAX_DIVERSITY_POOL = 200; // cap diversity re-ranking to avoid O(n²) on full catalog
   const rankedProducts = useMemo(() => {
     const raw = result?.rankedProducts ?? [];
-    return diversifyResults(raw, lambda, raw.length);
+    const pool = raw.slice(0, MAX_DIVERSITY_POOL);
+    return diversifyResults(pool, lambda, pool.length);
   }, [result, lambda]);
 
   const allSectionsSaved = PERSONALIZE_SECTION_ORDER.every((s) => savedSections.has(s));
@@ -125,9 +129,7 @@ export default function MatchesSection() {
         )}
 
         {/* Content */}
-        {!hasAnySection ? (
-          <MatchesEmptyState savedSections={savedSections} />
-        ) : isRecommending ? (
+        {isRecommending ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <ProductCardSkeleton key={i} />

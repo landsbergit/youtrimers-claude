@@ -172,7 +172,7 @@ export function BodyMap({ groups, selected, onToggle, onClose }: BodyMapProps) {
                     width: popW,
                   }}
                 >
-                  <p className="text-xs font-semibold text-foreground mb-2">{hotspot.label}</p>
+                  <p className="text-sm font-semibold text-foreground mb-2">{hotspot.label}</p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
                     {group.conditions
                       .filter((c) => {
@@ -194,7 +194,7 @@ export function BodyMap({ groups, selected, onToggle, onClose }: BodyMapProps) {
                           }
                           className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer flex-shrink-0"
                         />
-                        <span className="text-xs text-foreground group-hover:text-foreground/80 leading-snug">
+                        <span className="text-sm text-foreground group-hover:text-foreground/80 leading-snug">
                           {condition.displayName}
                         </span>
                       </label>

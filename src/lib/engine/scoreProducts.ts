@@ -175,17 +175,27 @@ function mergeIngredientMaps(
  * @param maxBundleSize  1 = singles only, 2 = also generate pairs,
  *                       3 = also generate triplets. Default 2.
  */
+/** Base preference boost per matching tag. Scaled down by qualityWeight. */
+const PREFERENCE_BOOST = 0.15;
+/** Boost for products carrying a "Free" tag matching a user restriction. */
+const RESTRICTION_FREE_BOOST = 0.12;
+/** Boost for products explicitly tagged for the member's gender. Disabled at quality-first. */
+const GENDER_BOOST = 0.10;
+
 export function scoreProducts(
   products: ProductWithIngredients[],
   consolidatedRules: ConsolidatedRules,
   nutrientDescendants?: Map<string, Set<string>>,
   qualityWeight = 0.5,
   maxBundleSize = 2,
+  foodPreferences: string[] = [],
+  foodRestrictions: string[] = [],
+  gender: string | null = null,
+  religiousPreferences: string[] = [],
 ): RankedProduct[] {
   const required = consolidatedRules.requirements.filter((r) => r.isRequired);
   const avoided = consolidatedRules.requirements.filter((r) => !r.isRequired);
-
-  if (required.length === 0) return [];
+  const hasRequirements = required.length > 0;
 
   // Pre-compute cost-per-serving bounds from singles for price normalisation.
   let minCost = Infinity;
@@ -215,6 +225,20 @@ export function scoreProducts(
   const singles: Candidate[] = [];
 
   for (const product of products) {
+    if (!hasRequirements) {
+      // No goals — 100% base score for all products
+      singles.push({
+        productGroup: [product],
+        coverageScore: 1.0,
+        matchedNutrientNodeIds: [],
+        missedNutrientNodeIds: [],
+        extraIngredientNames: [],
+        breakdown: {},
+        hardAvoidViolated: false,
+      });
+      continue;
+    }
+
     const ingredientByNodeId = new Map<string, ProductIngredient>();
     for (const ing of product.ingredients) {
       if (ing.ontologyNodeId) ingredientByNodeId.set(ing.ontologyNodeId, ing);
@@ -233,11 +257,11 @@ export function scoreProducts(
     }
   }
 
-  // ── 2. Generate bundle candidates ──────────────────────────────────────────
+  // ── 2. Generate bundle candidates (only when goals provide requirements) ───
 
   const bundles: Candidate[] = [];
 
-  if (maxBundleSize >= 2) {
+  if (hasRequirements && maxBundleSize >= 2) {
     // ── Candidate pool ──────────────────────────────────────────────────────
     // Two pools are merged to avoid missing specialist products:
     //
@@ -366,6 +390,11 @@ export function scoreProducts(
 
   const all: RankedProduct[] = [];
 
+  // Pre-compute preference, restriction, and religious sets for fast lookup
+  const prefSet = new Set(foodPreferences);
+  const restrictionSet = new Set(foodRestrictions);
+  const religiousSet = new Set(religiousPreferences);
+
   const applyBlend = (candidate: Candidate): RankedProduct | null => {
     // Hard requirement-level avoid violated — exclude entirely, never shown to user
     if (candidate.hardAvoidViolated) return null;
@@ -386,6 +415,79 @@ export function scoreProducts(
         qualityWeight * candidate.coverageScore + (1 - qualityWeight) * priceScore;
     }
 
+    // ── Food preference boost ────────────────────────────────────────────────
+    // Boost scales inversely with qualityWeight: at quality=0.1 → ~14%, quality=0.9 → ~7%
+    // For bundles: full boost if ALL products match, 50% if only some match.
+    const matchedPreferenceTags: string[] = [];
+    if (prefSet.size > 0) {
+      const perProductMatches = candidate.productGroup.map((p) => {
+        const tags = new Set(p.normalizedTags ?? []);
+        return [...prefSet].filter((pref) => tags.has(pref));
+      });
+
+      // Collect unique matched tags across all products in the bundle
+      const allMatched = new Set<string>();
+      for (const matches of perProductMatches) {
+        for (const tag of matches) allMatched.add(tag);
+      }
+      for (const tag of allMatched) matchedPreferenceTags.push(tag);
+
+      if (allMatched.size > 0) {
+        const boostPerTag = PREFERENCE_BOOST * (1 - qualityWeight * 0.5);
+        // Bundle ratio: 1.0 if all products match at least one pref tag, 0.5 if partial
+        const productsWithMatch = perProductMatches.filter((m) => m.length > 0).length;
+        const bundleRatio = productsWithMatch === candidate.productGroup.length ? 1.0 : 0.5;
+        const totalBoost = boostPerTag * allMatched.size * bundleRatio;
+        blendedScore *= 1 + totalBoost;
+      }
+    }
+
+    // ── Food restriction "Free" tag boost ──────────────────────────────────
+    // Products explicitly tagged "X_FREE" matching a selected restriction get a boost.
+    const matchedRestrictionFreeTags: string[] = [];
+    if (restrictionSet.size > 0) {
+      const allTags = new Set<string>();
+      for (const p of candidate.productGroup) {
+        for (const tag of p.normalizedTags ?? []) allTags.add(tag);
+      }
+      for (const restriction of restrictionSet) {
+        if (allTags.has(restriction)) {
+          matchedRestrictionFreeTags.push(restriction);
+        }
+      }
+      if (matchedRestrictionFreeTags.length > 0) {
+        blendedScore *= 1 + RESTRICTION_FREE_BOOST * matchedRestrictionFreeTags.length;
+      }
+    }
+
+    // ── Gender boost ──────────────────────────────────────────────────────
+    // Boost products explicitly tagged for the member's gender.
+    // Disabled when qualityWeight >= 0.9 (quality-first ignores gender label boost).
+    if (gender && qualityWeight < 0.9) {
+      const genderTag = gender === "FEMALE" ? "FEMALE" : gender === "MALE" ? "MALE" : null;
+      if (genderTag) {
+        const allTags = new Set<string>();
+        for (const p of candidate.productGroup) {
+          for (const tag of p.normalizedTags ?? []) allTags.add(tag);
+        }
+        if (allTags.has(genderTag)) {
+          blendedScore *= 1 + GENDER_BOOST;
+        }
+      }
+    }
+
+    // ── Religious tag matching ─────────────────────────────────────────────
+    const matchedReligiousTags: string[] = [];
+    if (religiousSet.size > 0) {
+      const allTags = new Set<string>();
+      for (const p of candidate.productGroup) {
+        for (const tag of p.normalizedTags ?? []) allTags.add(tag);
+      }
+      for (const rel of religiousSet) {
+        if (allTags.has(rel)) matchedReligiousTags.push(rel);
+      }
+    }
+
     const finalScore = Math.max(0, Math.min(1, blendedScore));
     if (finalScore < MIN_SCORE_THRESHOLD) return null;
 
@@ -396,6 +498,9 @@ export function scoreProducts(
       missedNutrientNodeIds: candidate.missedNutrientNodeIds,
       extraIngredientNames: candidate.extraIngredientNames,
       scoreBreakdown: candidate.breakdown,
+      matchedPreferenceTags,
+      matchedRestrictionFreeTags,
+      matchedReligiousTags,
     };
   };
 
@@ -404,10 +509,20 @@ export function scoreProducts(
     if (ranked) all.push(ranked);
   }
 
+  // Two-tier sort when food preferences are active:
+  // Tier 1: products matching ANY preference tag (sorted by score)
+  // Tier 2: products without preference tags (sorted by score)
+  // At high qualityWeight the tier separation is softened via the score boost.
   all.sort((a, b) => {
+    if (prefSet.size > 0) {
+      const aHasPref = a.matchedPreferenceTags.length > 0 ? 1 : 0;
+      const bHasPref = b.matchedPreferenceTags.length > 0 ? 1 : 0;
+      if (aHasPref !== bHasPref) return bHasPref - aHasPref;
+    }
     if (b.score !== a.score) return b.score - a.score;
     return b.matchedNutrientNodeIds.length - a.matchedNutrientNodeIds.length;
   });
 
-  return all;
+  // Cap results to avoid sending thousands of products to the UI
+  return all.slice(0, 200);
 }

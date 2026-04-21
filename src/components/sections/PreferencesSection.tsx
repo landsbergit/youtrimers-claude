@@ -205,6 +205,8 @@ export default function PreferencesSection() {
     dosageFormPreferencesSaved,
     setDosageFormPreferencesSaved,
     setReligiousPreferences,
+    foodPreferences: contextFoodPrefs,
+    setFoodPreferences: setContextFoodPrefs,
     maxBundleSize,
     setMaxBundleSize,
     saveSection,
@@ -289,15 +291,13 @@ export default function PreferencesSection() {
     saveSection("preferences");
   }, [selected, selectedSet, setAcceptedDosageFormNames, setDosageFormPreferencesSaved, saveSection]);
 
-  // Toggle a food preference and auto-save to localStorage
+  // Toggle a food preference — single selection: clicking a new one replaces the old
   const toggleFood = useCallback((nodeName: string) => {
-    const next = selectedFood.includes(nodeName)
-      ? selectedFood.filter((n) => n !== nodeName)
-      : [...selectedFood, nodeName];
+    const next = selectedFood.includes(nodeName) ? [] : [nodeName];
     setSelectedFood(next);
-    localStorage.setItem(LS_FOOD_PREFS, JSON.stringify(next));
+    setContextFoodPrefs(next);
     saveSection("preferences");
-  }, [selectedFood, saveSection]);
+  }, [selectedFood, setContextFoodPrefs, saveSection]);
 
   const ageDescription = (() => {
     if (!birthYear || !birthMonth) return null;
@@ -458,19 +458,23 @@ export default function PreferencesSection() {
                 {[1, 2, 3].map((i) => <div key={i} className="h-5 w-20 rounded bg-muted animate-pulse" />)}
               </>
             ) : (
-              [...dietaryNodes, ...(foodNodes ?? [])].map((node) => (
-                <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
-                  <input
-                    type="checkbox"
-                    checked={selectedFood.includes(node.nodeName)}
-                    onChange={() => toggleFood(node.nodeName)}
-                    className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
-                  />
-                  <span className="text-sm text-foreground group-hover:text-foreground/80">
-                    {node.displayName}
-                  </span>
-                </label>
-              ))
+              [...dietaryNodes, ...(foodNodes ?? [])].map((node) => {
+                const isActive = selectedFood.includes(node.nodeName);
+                return (
+                  <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group" onClick={(e) => { e.preventDefault(); toggleFood(node.nodeName); }}>
+                    <input
+                      type="radio"
+                      name="foodPreference"
+                      checked={isActive}
+                      readOnly
+                      className="h-4 w-4 accent-primary cursor-pointer flex-shrink-0"
+                    />
+                    <span className={`text-sm ${isActive ? "text-primary font-medium" : "text-foreground"} group-hover:text-foreground/80`}>
+                      {node.displayName}
+                    </span>
+                  </label>
+                );
+              })
             )}
           </div>
 

@@ -33,6 +33,8 @@ const LS_REPRO_STATUS    = "youtrimers_reproductive_status";
 const LS_DOSAGE_FORMS    = "youtrimers_dosage_forms";
 const LS_DOSAGE_SAVED    = "youtrimers_dosage_saved";
 const LS_RELIGIOUS_PREFS = "youtrimers_religious_preferences";
+const LS_FOOD_PREFS      = "youtrimers_food_prefs";
+const LS_FOOD_RESTRICT   = "youtrimers_food_restrictions";
 const LS_BODY_SIZE       = "youtrimers_body_size";
 const LS_HEIGHT_CM       = "youtrimers_height_cm";
 const LS_WEIGHT_KG       = "youtrimers_weight_kg";
@@ -65,6 +67,16 @@ interface RecommendationContextType {
   /** node_names of selected religious certifications, e.g. ["KOSHER", "HALAL"]. Empty = no filter. */
   religiousPreferences: string[];
   setReligiousPreferences: (names: string[]) => void;
+
+  // Preferences (section 3): food preference tags (scoring boost)
+  /** node_names of selected food preferences, e.g. ["ORGANIC", "VEGAN"]. Empty = no boost. */
+  foodPreferences: string[];
+  setFoodPreferences: (names: string[]) => void;
+
+  // Profile (section 2): food restriction tags (hard exclusion + "Free" boost)
+  /** node_names of selected food restrictions, e.g. ["LACTOSE_FREE", "GLUTEN_FREE"]. */
+  foodRestrictions: string[];
+  setFoodRestrictions: (names: string[]) => void;
 
   // Body size / measurements (section 2, bottom — future engine use)
   bodySize: "LOW" | "MEDIUM" | "HIGH" | null;
@@ -139,6 +151,16 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
     } catch { return []; }
   });
 
+  const [foodPreferences, setFoodPreferencesState] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(LS_FOOD_PREFS) ?? "[]"); }
+    catch { return []; }
+  });
+
+  const [foodRestrictions, setFoodRestrictionsState] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(LS_FOOD_RESTRICT) ?? "[]"); }
+    catch { return []; }
+  });
+
   const [bodySize, setBodySizeState] = useState<"LOW" | "MEDIUM" | "HIGH" | null>(() => {
     const v = localStorage.getItem(LS_BODY_SIZE);
     return (v === "LOW" || v === "MEDIUM" || v === "HIGH") ? v : null;
@@ -199,6 +221,16 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
   // this setter only updates context state so the engine re-runs immediately on save.
   const setReligiousPreferences = useCallback((names: string[]) => {
     setReligiousPreferencesState(names);
+  }, []);
+
+  const setFoodPreferences = useCallback((names: string[]) => {
+    setFoodPreferencesState(names);
+    localStorage.setItem(LS_FOOD_PREFS, JSON.stringify(names));
+  }, []);
+
+  const setFoodRestrictions = useCallback((names: string[]) => {
+    setFoodRestrictionsState(names);
+    localStorage.setItem(LS_FOOD_RESTRICT, JSON.stringify(names));
   }, []);
 
   const setBodySize = useCallback((s: "LOW" | "MEDIUM" | "HIGH" | null) => {
@@ -269,6 +301,10 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
         setDosageFormPreferencesSaved,
         religiousPreferences,
         setReligiousPreferences,
+        foodPreferences,
+        setFoodPreferences,
+        foodRestrictions,
+        setFoodRestrictions,
         bodySize,
         setBodySize,
         heightCm,

@@ -141,7 +141,7 @@ export function HealthConditionSearch({
         {open && suggestions.length > 0 && (
           <ul
             role="listbox"
-            className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg overflow-hidden max-h-64 overflow-y-auto"
+            className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-popover shadow-lg overflow-hidden max-h-64 overflow-y-auto"
           >
             {suggestions.map((c, i) => (
               <li
@@ -163,7 +163,7 @@ export function HealthConditionSearch({
         )}
 
         {open && query.trim().length > 0 && suggestions.length === 0 && !isLoading && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg px-3 py-2.5 text-sm text-muted-foreground">
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-popover shadow-lg px-3 py-2.5 text-sm text-muted-foreground">
             No conditions found for "{query}"
           </div>
         )}

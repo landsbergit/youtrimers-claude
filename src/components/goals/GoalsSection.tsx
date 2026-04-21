@@ -200,7 +200,7 @@ export default function GoalsSection() {
                 <button
                   key={cat.node_name}
                   onClick={() => handleCategoryChange(cat.node_name)}
-                  className={`flex items-center gap-1.5 py-1.5 text-sm whitespace-nowrap transition-colors flex-shrink-0
+                  className={`flex items-center gap-1.5 py-1.5 text-sm whitespace-nowrap transition-colors flex-shrink-0 rounded-full
                     ${isActive
                       ? "bg-[#22A68C] text-white font-semibold px-3"
                       : "text-muted-foreground font-medium hover:text-foreground hover:bg-muted/40 px-2.5"

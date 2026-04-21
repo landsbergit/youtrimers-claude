@@ -1,10 +1,10 @@
 import { useState, useRef } from "react";
 import { ExternalLink, Package, Check, ShoppingCart } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RankedProduct } from "@/types/engine";
 import { useCart } from "@/context/CartContext";
 import { MatchScoreBar } from "./MatchScoreBar";
 import { NutrientMatchPill } from "./NutrientMatchPill";
-import { ExtraIngredientsPill } from "./ExtraIngredientsPill";
 
 interface BundleCardProps {
   rank: number;
@@ -14,7 +14,7 @@ interface BundleCardProps {
 }
 
 export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions }: BundleCardProps) {
-  const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames } = rankedProduct;
+  const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames, matchedPreferenceTags, matchedRestrictionFreeTags, matchedReligiousTags } = rankedProduct;
   const { isInCart, addToCart } = useCart();
   const allInCart = products.every((p) => isInCart(p.id));
 
@@ -81,7 +81,7 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
                   <img
                     src={p.imageUrl}
                     alt={p.productName}
-                    className="w-full h-full object-contain p-0.5"
+                    className="w-full h-full object-contain rounded-lg"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[9px]">
@@ -123,44 +123,89 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
         </div>
       </div>
 
-      {/* Per-product rows */}
-      <div className="mt-3 space-y-2.5">
+      {/* Per-product rows with per-product tags and ingredients */}
+      <div className="mt-3 space-y-3 flex-1">
         {products.map((p, i) => {
           const cps = (p.costUsd / p.servingsPerContainer).toFixed(2);
+          const productTags = new Set(p.normalizedTags ?? []);
+
+          // Per-product preference tags
+          const prodPrefTags = matchedPreferenceTags.filter((tag) => productTags.has(tag));
+          // Per-product restriction "Free" tags
+          const prodFreeTags = matchedRestrictionFreeTags.filter((tag) => productTags.has(tag));
+          const prodReligiousTags = matchedReligiousTags.filter((tag) => productTags.has(tag));
+
           return (
-            <div key={p.id} className="flex items-start gap-2">
-              <span className="text-xs text-muted-foreground w-4 flex-shrink-0 mt-0.5">
-                {i + 1}.
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p
-                    className="text-sm font-medium text-foreground leading-snug truncate"
-                    title={p.productName}
-                  >
-                    {p.productName}
+            <div key={p.id}>
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-muted-foreground w-4 flex-shrink-0 mt-0.5">
+                  {i + 1}.
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className="text-sm font-medium text-foreground leading-snug truncate">
+                            {p.productName}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs rounded-full px-4 py-2">
+                          <p>{p.productName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    {p.productUrl && (
+                      <a
+                        href={p.productUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors mt-0.5"
+                        aria-label="View product"
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">${cps}/serving</span>
+                    {" · "}${p.costUsd.toFixed(2)}/bottle
+                    {p.normalizedDosageForm && (
+                      <span className="ml-1 capitalize">
+                        · {p.normalizedDosageForm.toLowerCase()}
+                      </span>
+                    )}
                   </p>
-                  {p.productUrl && (
-                    <a
-                      href={p.productUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0 text-muted-foreground hover:text-primary transition-colors mt-0.5"
-                      aria-label="View product"
-                    >
-                      <ExternalLink size={12} />
-                    </a>
+                  {/* Per-product tags */}
+                  {(prodPrefTags.length > 0 || prodFreeTags.length > 0 || prodReligiousTags.length > 0) && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {prodPrefTags.map((tag) => (
+                        <span
+                          key={`pref-${tag}`}
+                          className="inline-flex items-center rounded-full bg-[#E8A838]/10 border border-[#E8A838]/30 px-2.5 py-0.5 text-xs font-medium text-[#B07D1A]"
+                        >
+                          {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </span>
+                      ))}
+                      {prodFreeTags.map((tag) => (
+                        <span
+                          key={`free-${tag}`}
+                          className="inline-flex items-center rounded-full bg-[#11192A]/5 border border-[#11192A]/20 px-2.5 py-0.5 text-xs font-medium text-[#11192A]/70"
+                        >
+                          {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </span>
+                      ))}
+                      {prodReligiousTags.map((tag) => (
+                        <span
+                          key={`rel-${tag}`}
+                          className="inline-flex items-center rounded-full bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs font-medium text-primary"
+                        >
+                          {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">${cps}/serving</span>
-                  {" · "}${p.costUsd.toFixed(2)}/bottle
-                  {p.normalizedDosageForm && (
-                    <span className="ml-1 capitalize">
-                      · {p.normalizedDosageForm.toLowerCase()}
-                    </span>
-                  )}
-                </p>
               </div>
             </div>
           );
@@ -178,9 +223,9 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
         </span>
       </div>
 
-      {/* Nutrient pills */}
-      <div className="mt-3 flex-1">
-        {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
+      {/* Bundle-level nutrient match pills */}
+      {allNutrients.length > 0 && (
+        <div className="mt-3">
           <div className="flex flex-wrap gap-1.5">
             {allNutrients.map(({ id, matched }) => (
               <NutrientMatchPill
@@ -190,10 +235,9 @@ export function BundleCard({ rank, rankedProduct, nutrientNames, nutrientDescrip
                 tooltip={nutrientDescriptions.get(id)}
               />
             ))}
-            <ExtraIngredientsPill names={extraIngredientNames} />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Single bundle cart control — pushed to bottom */}
       <div className="mt-3 pt-3 border-t border-border">

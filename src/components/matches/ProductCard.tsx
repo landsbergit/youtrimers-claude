@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RankedProduct } from "@/types/engine";
 import { useCart } from "@/context/CartContext";
 import { MatchScoreBar } from "./MatchScoreBar";
@@ -17,7 +18,7 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions }: ProductCardProps) {
-  const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames } = rankedProduct;
+  const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames, matchedPreferenceTags, matchedRestrictionFreeTags, matchedReligiousTags } = rankedProduct;
   const product = products[0];
   const { isInCart } = useCart();
   const inCart = isInCart(product.id);
@@ -59,7 +60,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
               <img
                 src={product.imageUrl}
                 alt={product.productName}
-                className="w-full h-full object-contain p-1"
+                className="w-full h-full object-contain rounded-lg"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
@@ -91,14 +92,23 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
               <span className="text-xs font-bold text-muted-foreground w-5 flex-shrink-0">
                 #{rank}
               </span>
-              <p
-                onClick={() => setTitleExpanded((v) => !v)}
-                className={`text-sm font-medium text-foreground leading-snug cursor-pointer select-none ${
-                  titleExpanded ? "" : "line-clamp-2"
-                }`}
-              >
-                {product.productName}
-              </p>
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p
+                      onClick={() => setTitleExpanded((v) => !v)}
+                      className={`text-sm font-medium text-foreground leading-snug cursor-pointer select-none ${
+                        titleExpanded ? "" : "line-clamp-2"
+                      }`}
+                    >
+                      {product.productName}
+                    </p>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs rounded-full px-4 py-2">
+                    <p>{product.productName}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {product.productUrl && (
               <a
@@ -132,9 +142,9 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
         </div>
       </div>
 
-      {/* Nutrient match pills + extra ingredients */}
+      {/* Nutrient match pills + extra ingredients + preference tags */}
       <div className="mt-3 flex-1">
-        {(allNutrients.length > 0 || extraIngredientNames.length > 0) && (
+        {(allNutrients.length > 0 || extraIngredientNames.length > 0 || matchedPreferenceTags.length > 0 || matchedRestrictionFreeTags.length > 0 || matchedReligiousTags.length > 0) && (
           <div className="flex flex-wrap gap-1.5">
             {allNutrients.map(({ id, matched }) => (
               <NutrientMatchPill
@@ -145,6 +155,30 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
               />
             ))}
             <ExtraIngredientsPill names={extraIngredientNames} />
+            {matchedPreferenceTags.map((tag) => (
+              <span
+                key={`pref-${tag}`}
+                className="inline-flex items-center rounded-full bg-[#E8A838]/10 border border-[#E8A838]/30 px-2.5 py-0.5 text-xs font-medium text-[#B07D1A]"
+              >
+                {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+              </span>
+            ))}
+            {matchedRestrictionFreeTags.map((tag) => (
+              <span
+                key={`free-${tag}`}
+                className="inline-flex items-center rounded-full bg-[#11192A]/5 border border-[#11192A]/20 px-2.5 py-0.5 text-xs font-medium text-[#11192A]/70"
+              >
+                {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+              </span>
+            ))}
+            {matchedReligiousTags.map((tag) => (
+              <span
+                key={`rel-${tag}`}
+                className="inline-flex items-center rounded-full bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs font-medium text-primary"
+              >
+                {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+              </span>
+            ))}
           </div>
         )}
       </div>

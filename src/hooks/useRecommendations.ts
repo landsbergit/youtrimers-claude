@@ -4,6 +4,7 @@ import { groupRpcRowsIntoFiredRules, consolidateRules } from "@/lib/engine/conso
 import { scoreProducts } from "@/lib/engine/scoreProducts";
 import { applyDemographicFilter } from "@/lib/engine/applyDemographicFilter";
 import { applyReligiousFilter } from "@/lib/engine/applyReligiousFilter";
+import { applyFoodRestrictionFilter } from "@/lib/engine/applyFoodRestrictionFilter";
 import { useProductCatalog } from "./useProductCatalog";
 import type { MemberProfile, RankedProduct, ConsolidatedRules } from "@/types/engine";
 
@@ -43,30 +44,40 @@ export function useRecommendations(profile: MemberProfile) {
       profile.birthYear ?? "",
       profile.birthMonth ?? "",
       [...profile.religiousPreferences].sort().join(","),
+      [...profile.foodPreferences].sort().join(","),
+      [...profile.foodRestrictions].sort().join(","),
       // body measurements — future engine use; included so any change auto-reruns
       profile.bodySize ?? "",
       profile.heightCm ?? "",
       profile.weightKg ?? "",
     ],
     staleTime: STALE_TIME,
-    enabled: goalIds.length > 0 && catalog != null,
+    enabled: catalog != null,
     queryFn: async (): Promise<RecommendationResult> => {
-      // 1. Fetch matching rules via RPC
-      const { data: rpcRows, error } = await supabase.rpc("get_rules_for_goals", {
-        p_goal_ids: goalIds,
-      });
-
-      if (error) throw new Error(error.message);
-
-      const firedRules = groupRpcRowsIntoFiredRules(rpcRows ?? []);
-
-      // 2. Consolidate
-      const consolidated = consolidateRules(firedRules);
-
-      // 3. Expand each required nutrient to its full descendant set so that
-      //    e.g. VITAMIN_D3 (child) satisfies a VITAMIN_D (parent) requirement.
-      const nutrientNodeIds = consolidated.requirements.map((r) => r.nutrientNodeId);
+      // 1. Fetch matching rules via RPC (skip when no goals)
+      let consolidated: ConsolidatedRules;
       let nutrientDescendants: Map<string, Set<string>> | undefined;
+
+      if (goalIds.length > 0) {
+        const { data: rpcRows, error } = await supabase.rpc("get_rules_for_goals", {
+          p_goal_ids: goalIds,
+        });
+        if (error) throw new Error(error.message);
+        const firedRules = groupRpcRowsIntoFiredRules(rpcRows ?? []);
+        consolidated = consolidateRules(firedRules);
+      } else {
+        // No goals — empty rules, engine uses 100% base score
+        consolidated = {
+          requirements: [],
+          preferredTagNodeIds: [],
+          avoidedTagNodeIds: [],
+          preferredFormNodeIds: [],
+          firedRuleIds: [],
+        };
+      }
+
+      // 3. Expand each required nutrient to its full descendant set
+      const nutrientNodeIds = consolidated.requirements.map((r) => r.nutrientNodeId);
       if (nutrientNodeIds.length > 0) {
         const { data: descRows } = await supabase.rpc("get_nutrient_descendants", {
           p_node_ids: nutrientNodeIds,
@@ -98,13 +109,19 @@ export function useRecommendations(profile: MemberProfile) {
         profile.religiousPreferences,
       );
 
-      // 5b. Apply dosage form pre-filter when preferences have been set
-      let scoringCatalog = religiousCatalog;
+      // 5b. Apply food restriction hard-exclusion filter
+      const restrictionCatalog = applyFoodRestrictionFilter(
+        religiousCatalog,
+        profile.foodRestrictions,
+      );
+
+      // 5c. Apply dosage form pre-filter when preferences have been set
+      let scoringCatalog = restrictionCatalog;
       let dosageFormFallback = false;
 
       if (profile.acceptedDosageFormNames.length > 0) {
         const acceptedSet = new Set(profile.acceptedDosageFormNames);
-        const filtered = religiousCatalog.filter(
+        const filtered = restrictionCatalog.filter(
           (p) => p.normalizedDosageForm === null || acceptedSet.has(p.normalizedDosageForm),
         );
         if (filtered.length > 0) {
@@ -119,6 +136,8 @@ export function useRecommendations(profile: MemberProfile) {
       const rankedProducts = scoreProducts(
         scoringCatalog, consolidated, nutrientDescendants,
         profile.qualityWeight, profile.maxBundleSize,
+        profile.foodPreferences, profile.foodRestrictions,
+        profile.gender, profile.religiousPreferences,
       );
 
       // 6. Persist audit trail (fire-and-forget — do not await)

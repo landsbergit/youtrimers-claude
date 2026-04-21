@@ -104,7 +104,7 @@ export function FilterSidebar() {
 
   return (
     <aside>
-      <p className="text-xs text-muted-foreground text-center mb-2">Personalization Panel</p>
+      <h2 className="font-heading text-foreground text-3xl mb-3 cursor-default">Personalization Panel</h2>
       <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
       <CollapsibleFilterGroup title="Goals" defaultOpen summary={goalsSummary}>
         <GoalsSection />

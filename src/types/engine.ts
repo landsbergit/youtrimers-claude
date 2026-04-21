@@ -39,8 +39,14 @@ export interface MemberProfile {
   qualityWeight: number; // 0 = rank by price, 1 = rank by match quality, default 0.5
   maxBundleSize: number; // 1 = singles only, 2 = pairs, 3 = triplets. Default 2.
 
-  // future: foodRestrictions?: string[];     // e.g. VEGAN, GLUTEN_FREE
-  // future: foodPreferences?: string[];      // e.g. ORGANIC, NON_GMO
+  /** Tag node_names the user prefers (e.g. ORGANIC, NON_GMO, VEGAN).
+   *  Products with matching tags get a scoring boost. */
+  foodPreferences: string[];
+
+  /** Restriction node_names (e.g. LACTOSE_FREE, GLUTEN_FREE).
+   *  Products containing banned ingredients are hard-excluded.
+   *  Products tagged "X_FREE" get a scoring boost. */
+  foodRestrictions: string[];
   // future: healthConditionIds?: string[];   // ontology node UUIDs
   // future: medicationIds?: string[];        // ontology node UUIDs
   // future: currentSupplementIds?: number[]; // product IDs
@@ -150,4 +156,10 @@ export interface RankedProduct {
   missedNutrientNodeIds: string[];
   extraIngredientNames: string[]; // linked ingredients not covering any requirement
   scoreBreakdown: Record<string, number>; // nutrientNodeId → contribution
+  /** Tag names from the user's food preferences that this product/bundle carries. */
+  matchedPreferenceTags: string[];
+  /** "Free" tags matching the user's food restrictions (e.g. "LACTOSE_FREE"). */
+  matchedRestrictionFreeTags: string[];
+  /** Religious certification tags matching the user's selection (e.g. "KOSHER"). */
+  matchedReligiousTags: string[];
 }

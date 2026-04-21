@@ -297,13 +297,16 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 
 ### New profile fields (UI + engine)
 - **Height & weight** → add to BasicProfile section in ProfileSection (explicit instructions pending)
+- **Pill size preference** — allow users to indicate preference for smaller pills (e.g., easy-to-swallow). Extract pill/tablet dimensions from iHerb product data where available. Use as a scoring factor or filter in the engine.
+- **Time of day intake** — allow users to specify preferred intake time (morning, evening, with meals, etc.). Use to recommend products with compatible dosing instructions and flag potential timing conflicts (e.g., energizing supplements not recommended at night). Requires extracting dosing/timing info from product data.
 - **LIFE_STYLE ontology branch** → exercise frequency, sleep, stress etc. (children TBD) — add UI + engine rules when ready
 - **DIET ontology branch** → weekly food intake self-assessment → derive nutrient requirements per nutrient group — significant feature, design needed
 
 ### Data pipeline
+- **Add "No Artificial Colors or Flavors" to ontology** — Add as a node under TAGS or FOOD_RESTRICTIONS. Extract from iHerb product descriptions/labels. Wire into food preferences or restrictions for scoring boost / filtering.
 - Rebuild iHerb data extraction pipeline: minerals, non-vitamin nutrients, complete vitamin dose data (populates `product_ingredients.amount_per_serving` / `amount_unit` → unlocks dose-based scoring automatically)
 - **HTML entities in product names** — `&amp;` and `&#174;` (®) not decoded in `3A_extract.py`; fix with `html.unescape()` on extracted product name
-- **Low tag coverage** — product descriptions explicitly contain "Non GMO", "Gluten Free" etc. but only one tag matches per product; investigate whether TAGS ontology aliases cover non-hyphenated variants (e.g. "Non GMO" vs "Non-GMO") and whether `product_overview` is correctly reaching 7B's TAGS group
+- **Low tag coverage (partially addressed)** — `batch_extract_tags.py` in `dataPrep_iHerb/` scans all scraped HTML pages for "Free" / preference labels (Gluten Free, Organic, Vegan, etc.) using regex and merges them into `products.normalized_tags` in Supabase. Run with `--dry-run` first to preview, then without for live update. Requires `SUPABASE_SERVICE_ROLE_KEY` in env. Does NOT remove existing tags — only appends new ones. Handles all hyphenated/non-hyphenated variants (e.g. "Non GMO", "Non-GMO", "non-gmo").
 - **VEGETERIAN typo** in ontology node name (should be VEGETARIAN) — fix in Supabase ontology table and in Ontology.yaml source file
 - **US-only products** — some iHerb products are geo-restricted and skipped during scraping from an Israeli IP; to capture them, connect Chrome to a US VPN before launching with `--remote-debugging-port=9222`, then run a targeted re-scrape of the missing product IDs
 
@@ -322,5 +325,10 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 ### Design Decisions
 - **Product cards: equal height per row (not masonry)** — Cards in the Matches grid use equal-height rows (CSS grid default stretch). This means shorter cards have empty space at the bottom, but the reading order is natural left-to-right (1,2 then 3,4). The alternative (CSS `columns` masonry) would eliminate empty space but changes the reading order to column-first (1,3,5 left; 2,4,6 right), which is confusing for ranked results. Decision: keep uniform row height for predictable reading order.
 
+- **Default product display (no goals selected)** — When no goals are selected, the Matches section shows N products (default 16) sampled from demographic groups (Female, Male, Senior, Adult, Teen, Child, Baby) in round-robin order: positions 1–7 show one from each group, 8–14 another from each group, etc. Random selection within each group. All existing filters apply (gender hard exclusion, age preferred exclusion, religious, food restrictions). Remaining slots fill from untagged products. Component: `DefaultProductGrid.tsx`. When goals are selected, switches to the full engine pipeline.
+
+- **Demographic engine behaviors** — Gender: hard-exclude opposite gender (existing) + 10% score boost for matching gender tag (disabled at quality-first, qualityWeight ≥ 0.9). Age: "preferred exclusion" — age-inappropriate products are filtered out, but if filtering leaves zero results the filter is bypassed (fallback). Both behaviors persist when goals are selected. Terminology: "preferred exclusion" = prefer not to show but show if nothing else available.
+
 ### Maintenance
 - Delete test rule "test1" (needs service role key or SQL Editor)
+- **Deactivate non-supplement products** — Audit and deactivate food/cosmetic products incorrectly marked as active supplements (e.g., Soy Sauce ID 14054). Run via SQL Editor: `UPDATE products SET is_active = false WHERE id IN (...)`. Consider adding a product-type column or automated detection in the data pipeline to prevent future occurrences.

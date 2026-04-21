@@ -35,6 +35,40 @@ function ageInMonths(birthYear: number, birthMonth: number | null): number {
  * If gender or birthYear is unknown, the corresponding exclusions are skipped.
  * Products with no tags, or none of the excluded tags, are always kept.
  */
+/**
+ * Returns the set of age tags to exclude given birth info.
+ * Exported so other modules can compute the member's matching age tag.
+ */
+export function getAgeExcludedTags(birthYear: number, birthMonth: number | null): Set<string> {
+  const excluded = new Set<string>();
+  const months = ageInMonths(birthYear, birthMonth);
+
+  if (months < 12) {
+    excluded.add("CHILD"); excluded.add("TEEN"); excluded.add("ADULT"); excluded.add("SENIOR");
+  } else if (months < 156) {
+    excluded.add("TEEN"); excluded.add("ADULT"); excluded.add("SENIOR");
+  } else if (months < 216) {
+    excluded.add("BABY"); excluded.add("ADULT"); excluded.add("SENIOR");
+  } else if (months < 720) {
+    excluded.add("BABY"); excluded.add("CHILD"); excluded.add("TEEN"); excluded.add("SENIOR");
+  } else {
+    excluded.add("BABY"); excluded.add("CHILD"); excluded.add("TEEN");
+  }
+  return excluded;
+}
+
+/**
+ * Returns the matching age tag for the member's age.
+ */
+export function getMatchingAgeTag(birthYear: number, birthMonth: number | null): string {
+  const months = ageInMonths(birthYear, birthMonth);
+  if (months < 12) return "BABY";
+  if (months < 156) return "CHILD";
+  if (months < 216) return "TEEN";
+  if (months < 720) return "ADULT";
+  return "SENIOR";
+}
+
 export function applyDemographicFilter(
   products: ProductWithIngredients[],
   gender: string | null,
@@ -42,59 +76,35 @@ export function applyDemographicFilter(
   birthYear: number | null,
   birthMonth: number | null,
 ): ProductWithIngredients[] {
-  const excluded = new Set<string>();
-
-  // ── Gender ────────────────────────────────────────────────────────────────
+  // ── Gender (hard exclusion) ──────────────────────────────────────────────
+  const genderExcluded = new Set<string>();
   if (gender === "MALE") {
-    excluded.add("FEMALE");
-    excluded.add("PRENATAL");
-    excluded.add("POSTNATAL");
+    genderExcluded.add("FEMALE"); genderExcluded.add("PRENATAL"); genderExcluded.add("POSTNATAL");
   } else if (gender === "FEMALE") {
-    excluded.add("MALE");
+    genderExcluded.add("MALE");
     if (reproductiveStatus !== "PREGNANCY") {
-      excluded.add("PRENATAL");
-      excluded.add("POSTNATAL");
+      genderExcluded.add("PRENATAL"); genderExcluded.add("POSTNATAL");
     }
   }
-  // OTHER / PREFER_NOT_TO_SAY / null → no gender-based exclusions.
 
-  // ── Age ───────────────────────────────────────────────────────────────────
+  let filtered = genderExcluded.size > 0
+    ? products.filter((p) => !p.normalizedTags.some((tag) => genderExcluded.has(tag)))
+    : products;
+
+  // ── Age (preferred exclusion — fallback to unfiltered if result is empty) ─
   if (birthYear !== null) {
-    const months = ageInMonths(birthYear, birthMonth);
-
-    if (months < 12) {
-      // Baby
-      excluded.add("CHILD");
-      excluded.add("TEEN");
-      excluded.add("ADULT");
-      excluded.add("SENIOR");
-    } else if (months < 156) {
-      // Child (1–12 yr)
-      excluded.add("TEEN");
-      excluded.add("ADULT");
-      excluded.add("SENIOR");
-    } else if (months < 216) {
-      // Teen (13–17 yr)
-      excluded.add("BABY");
-      excluded.add("ADULT");
-      excluded.add("SENIOR");
-    } else if (months < 720) {
-      // Adult (18–59 yr)
-      excluded.add("BABY");
-      excluded.add("CHILD");
-      excluded.add("TEEN");
-      excluded.add("SENIOR");
-    } else {
-      // Senior (60+ yr) — may still see ADULT products
-      excluded.add("BABY");
-      excluded.add("CHILD");
-      excluded.add("TEEN");
+    const ageExcluded = getAgeExcludedTags(birthYear, birthMonth);
+    if (ageExcluded.size > 0) {
+      const ageFiltered = filtered.filter(
+        (p) => !p.normalizedTags.some((tag) => ageExcluded.has(tag)),
+      );
+      // Preferred exclusion: use filtered result unless it's empty
+      if (ageFiltered.length > 0) {
+        filtered = ageFiltered;
+      }
+      // else: fall back to gender-filtered set (includes age-inappropriate products)
     }
   }
 
-  if (excluded.size === 0) return products;
-
-  return products.filter(
-    (p) => !p.normalizedTags.some((tag) => excluded.has(tag)),
-  );
+  return filtered;
 }

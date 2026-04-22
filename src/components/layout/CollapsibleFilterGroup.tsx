@@ -42,7 +42,7 @@ export function CollapsibleFilterGroup({
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="px-4 pb-4">{children}</div>
+        <div className="px-4 pt-3 pb-4">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );

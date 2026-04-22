@@ -144,6 +144,15 @@ export interface ProductWithIngredients {
   costUsd: number;           // always positive — products without valid price are excluded from catalog
   servingsPerContainer: number; // always positive
   ingredients: ProductIngredient[];
+  /** Quality tier enum — populated once the pipeline lands it.
+   *  Undefined/null until then; findSimilar treats missing as non-failing. */
+  qualityTier?: string | null;
+  /** Minor descriptive fields used by Find Similar to surface explanatory diffs.
+   *  Columns exist in DB (migration 026); population is pending pipeline work. */
+  flavor?: string | null;
+  /** ISO YYYY-MM-DD. */
+  expirationDate?: string | null;
+  packaging?: string | null;
 }
 
 // ── Scoring output ─────────────────────────────────────────────────────────────

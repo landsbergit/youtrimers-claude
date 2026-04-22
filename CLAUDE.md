@@ -219,7 +219,7 @@ After each save, auto-scroll to next unsaved section (or `#matches` when all don
 
 ## Database Conventions
 
-- **Migrations:** `supabase/migrations/NNN_description.sql` — next is `024_...`
+- **Migrations:** `supabase/migrations/NNN_description.sql` — next is `027_...`
 - **Apply:** `npx supabase db push` (prompts Y/n — answer Y)
 - **Type stubs:** `src/types/database.ts` — manually maintained; add table types for every new table
 - **RLS pattern:** every member table uses:
@@ -308,12 +308,19 @@ Phase 2 cannot begin until: affiliate program is live, site is active, and legal
 - **HTML entities in product names** — `&amp;` and `&#174;` (®) not decoded in `3A_extract.py`; fix with `html.unescape()` on extracted product name
 - **Low tag coverage (partially addressed)** — `batch_extract_tags.py` in `dataPrep_iHerb/` scans all scraped HTML pages for "Free" / preference labels (Gluten Free, Organic, Vegan, etc.) using regex and merges them into `products.normalized_tags` in Supabase. Run with `--dry-run` first to preview, then without for live update. Requires `SUPABASE_SERVICE_ROLE_KEY` in env. Does NOT remove existing tags — only appends new ones. Handles all hyphenated/non-hyphenated variants (e.g. "Non GMO", "Non-GMO", "non-gmo").
 - **VEGETERIAN typo** in ontology node name (should be VEGETARIAN) — fix in Supabase ontology table and in Ontology.yaml source file
+- **Mark non-supplement products as food in pipeline** — Automate detection of food, pet, cosmetic, and household products during the extraction pipeline. Add a `product_type` column or classification step in `3A_extract.py` that flags non-supplement products (based on iHerb category, product name keywords, or page structure) so they are automatically set as `is_active = false` or excluded from the catalog. Currently handled via manual SQL audit.
 - **US-only products** — some iHerb products are geo-restricted and skipped during scraping from an Israeli IP; to capture them, connect Chrome to a US VPN before launching with `--remote-debugging-port=9222`, then run a targeted re-scrape of the missing product IDs
 
 ### Scoring & recommendations
 - Scoring Phase 2: quality_tier bonus in scoreProducts.ts
+- **Wire `quality_tier` into the catalog** — once the DB column is added, extend `useProductCatalog.ts` to select it and populate `ProductWithIngredients.qualityTier`. Then update `QUALITY_TIER_RANK` in `src/lib/engine/findSimilar.ts` to match the real enum values (placeholder is `BUDGET < STANDARD < PREMIUM`). Until then, the quality-tier axis in Find Similar is a silent no-op.
 - Bundle improvements: overlap penalty, dedup in UI, triplet price penalty
-- "Explore Similar" feature on liked products in Matches
+
+### Find Similar
+- **Populate minor-diff fields on products** — Migration `026_product_minor_fields.sql` added `flavor`, `expiration_date`, `packaging` to the `products` table (all nullable, unpopulated). The Find Similar engine already reads them and surfaces differences when present; no engine changes needed. Remaining work is extraction:
+  - `expiration_date` → extract in `dataPrep_iHerb/3A_extract.py` (first-class product metadata).
+  - `packaging` → extract in `dataPrep_iHerb/3A_extract.py` (first-class product metadata).
+  - `flavor` → new batch script `dataPrep_iHerb/batch_extract_flavors.py` (regex over scraped HTML, similar pattern to `batch_extract_tags.py`, but writes to the single-value `flavor` column rather than to `normalized_tags`).
 
 ### UX & Content
 - **Search medications by diseases** — allow users to find medications by searching for a disease/condition name, then select from medications commonly prescribed for that condition. Requires a disease-to-medication mapping (ontology or external API). Button placeholder already exists in ProfileSection Medications sub-section.

@@ -316,6 +316,9 @@ export type Database = {
           package_quantity: number | null;
           cost_usd: number | null;
           normalized_tags: string[] | null;
+          flavor: string | null;
+          expiration_date: string | null;
+          packaging: string | null;
           is_active: boolean;
           created_at: string;
         };
@@ -332,6 +335,9 @@ export type Database = {
           package_quantity?: number | null;
           cost_usd?: number | null;
           normalized_tags?: string[] | null;
+          flavor?: string | null;
+          expiration_date?: string | null;
+          packaging?: string | null;
           is_active?: boolean;
           created_at?: string;
         };
@@ -348,6 +354,9 @@ export type Database = {
           package_quantity?: number | null;
           cost_usd?: number | null;
           normalized_tags?: string[] | null;
+          flavor?: string | null;
+          expiration_date?: string | null;
+          packaging?: string | null;
           is_active?: boolean;
           created_at?: string;
         };

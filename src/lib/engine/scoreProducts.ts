@@ -509,12 +509,10 @@ export function scoreProducts(
     if (ranked) all.push(ranked);
   }
 
-  // Two-tier sort when food preferences are active:
-  // Tier 1: products matching ANY preference tag (sorted by score)
-  // Tier 2: products without preference tags (sorted by score)
-  // At high qualityWeight the tier separation is softened via the score boost.
+  // Two-tier sort when food preferences are active AND quality is not prioritized.
+  // Disabled at quality-first (qualityWeight >= 0.9) — sort purely by score.
   all.sort((a, b) => {
-    if (prefSet.size > 0) {
+    if (prefSet.size > 0 && qualityWeight < 0.9) {
       const aHasPref = a.matchedPreferenceTags.length > 0 ? 1 : 0;
       const bHasPref = b.matchedPreferenceTags.length > 0 ? 1 : 0;
       if (aHasPref !== bHasPref) return bHasPref - aHasPref;

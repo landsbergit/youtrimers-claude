@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import type { Goal } from "@/types/goals";
+import type { RankedProduct } from "@/types/engine";
 
 // The five personalization sections, in page order.
 export type SectionKey = "goals" | "profile" | "preferences" | "supplements" | "approach";
@@ -105,6 +106,11 @@ interface RecommendationContextType {
   savedSections: Set<SectionKey>;
   saveSection: (key: SectionKey) => void;
 
+  // Similar products mode: when set, MatchesSection filters to products similar
+  // to this anchor and pins the anchor at the top. Session-only state.
+  similarAnchor: RankedProduct | null;
+  setSimilarAnchor: (rp: RankedProduct | null) => void;
+
   // Derived: goal IDs for the engine
   goalIds: string[];
 
@@ -181,6 +187,7 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
   const [maxBundleSize, setMaxBundleSize] = useState<number>(2);
   const [diversityWeight, setDiversityWeight] = useState<number>(0.5);
   const [savedSections, setSavedSections] = useState<Set<SectionKey>>(new Set());
+  const [similarAnchor, setSimilarAnchor] = useState<RankedProduct | null>(null);
 
   const setGender = useCallback((g: string | null) => {
     setGenderState(g);
@@ -321,6 +328,8 @@ export function RecommendationProvider({ children }: { children: ReactNode }) {
         setDiversityWeight,
         savedSections,
         saveSection,
+        similarAnchor,
+        setSimilarAnchor,
         goalIds,
         scrollToNextSection,
       }}

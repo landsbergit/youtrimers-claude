@@ -1,12 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRecommendationContext, SECTION_ORDER, PERSONALIZE_SECTION_ORDER, SECTION_LABELS, type SectionKey } from "@/context/RecommendationContext";
 import { useRecommendations } from "@/hooks/useRecommendations";
 import { useProductCatalog } from "@/hooks/useProductCatalog";
 import { ProductCard } from "@/components/matches/ProductCard";
 import { BundleCard } from "@/components/matches/BundleCard";
 import { ProductCardSkeleton } from "@/components/matches/ProductCardSkeleton";
+import { SimilarityPill } from "@/components/matches/SimilarityPill";
 import { diversifyResults } from "@/lib/engine/diversifyResults";
-import { CheckCircle2, Circle, ChevronRight, AlertTriangle } from "lucide-react";
+import { findSimilar } from "@/lib/engine/findSimilar";
+import { getMatchingAgeTag } from "@/lib/engine/applyDemographicFilter";
+import { CheckCircle2, Circle, ChevronRight, AlertTriangle, ArrowLeft } from "lucide-react";
 
 const DISCRETE_LABELS: { value: number; label: string }[] = [
   { value: 0.1, label: "Budget" },
@@ -21,7 +24,9 @@ function approachLabel(qualityWeight: number): string {
 }
 
 const PAGE_SIZE = 16;
+const SIMILAR_PAGE_SIZE = 8;
 const MAX_PAGES = 5;
+const MAX_DISPLAY = PAGE_SIZE * MAX_PAGES;
 
 export default function MatchesSection() {
   const {
@@ -41,8 +46,15 @@ export default function MatchesSection() {
     bodySize,
     heightCm,
     weightKg,
+    similarAnchor,
+    setSimilarAnchor,
   } = useRecommendationContext();
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
+
+  // Reset paging whenever similar-mode is entered or exited
+  useEffect(() => {
+    setDisplayCount(similarAnchor ? SIMILAR_PAGE_SIZE : PAGE_SIZE);
+  }, [similarAnchor]);
 
   const { data: result, isLoading: isRecommending } = useRecommendations({
     goalIds,
@@ -104,7 +116,27 @@ export default function MatchesSection() {
     return diversifyResults(pool, lambda, pool.length);
   }, [result, lambda]);
 
+  // Similar mode: filter the ranked pool to candidates similar to the anchor.
+  // Pool = full scored list (already has hard filters applied upstream).
+  const similarCandidates = useMemo(() => {
+    if (!similarAnchor) return [];
+    const pool = result?.rankedProducts ?? [];
+    return findSimilar(similarAnchor, pool);
+  }, [similarAnchor, result]);
+
+  const inSimilarMode = similarAnchor != null;
+  const displayLength = inSimilarMode ? similarCandidates.length : rankedProducts.length;
+  const pageSize = inSimilarMode ? SIMILAR_PAGE_SIZE : PAGE_SIZE;
+
   const allSectionsSaved = PERSONALIZE_SECTION_ORDER.every((s) => savedSections.has(s));
+  const hasGoals = goalIds.length > 0;
+  const ageTag = birthYear ? getMatchingAgeTag(birthYear, birthMonth) : null;
+
+  const anchorName = similarAnchor
+    ? similarAnchor.products.length > 1
+      ? `${similarAnchor.products[0].productName} + ${similarAnchor.products.length - 1} more`
+      : similarAnchor.products[0].productName
+    : "";
 
   return (
     <div id="matches">
@@ -112,8 +144,28 @@ export default function MatchesSection() {
           className="font-heading text-foreground text-3xl mb-3 cursor-default"
           title="Supplements matched to your personal profile."
         >
-          Matches
+          {inSimilarMode ? "Similar products" : "Matches"}
         </h2>
+
+        {/* Similar-mode banner: back link + anchor name */}
+        {inSimilarMode && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setSimilarAnchor(null)}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors text-left"
+            >
+              <ArrowLeft size={14} className="flex-shrink-0" />
+              <span>
+                <span className="whitespace-nowrap">Back to</span>{" "}
+                <span className="whitespace-nowrap">original list</span>
+              </span>
+            </button>
+            <p className="text-sm text-muted-foreground truncate">
+              Showing products similar to: <span className="text-foreground font-medium">{anchorName}</span>
+            </p>
+          </div>
+        )}
 
         {/* Dosage form fallback warning */}
         {result?.dosageFormFallback && (
@@ -135,7 +187,7 @@ export default function MatchesSection() {
               <ProductCardSkeleton key={i} />
             ))}
           </div>
-        ) : rankedProducts.length === 0 ? (
+        ) : displayLength === 0 && !inSimilarMode ? (
           <div className="py-12 text-center">
             <p className="text-muted-foreground">
               No matching products found for your current goals. Try adding more
@@ -145,45 +197,138 @@ export default function MatchesSection() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {rankedProducts.slice(0, displayCount).map((rp, idx) => {
-                const key = rp.products.map((p) => p.id).join("-");
-                const isBundle = rp.products.length > 1;
-                return isBundle ? (
-                  <BundleCard
-                    key={key}
-                    rank={idx + 1}
-                    rankedProduct={rp}
-                    nutrientNames={nutrientNames}
-                    nutrientDescriptions={nutrientDescriptions}
-                  />
-                ) : (
-                  <ProductCard
-                    key={key}
-                    rank={idx + 1}
-                    rankedProduct={rp}
-                    nutrientNames={nutrientNames}
-                    nutrientDescriptions={nutrientDescriptions}
-                  />
+              {/* Pinned anchor in similar mode */}
+              {inSimilarMode && similarAnchor && (() => {
+                const key = `anchor-${similarAnchor.products.map((p) => p.id).join("-")}`;
+                const isBundle = similarAnchor.products.length > 1;
+                return (
+                  <div className="md:col-span-2 relative">
+                    <span className="absolute -top-2 left-4 z-10 inline-flex items-center rounded-full bg-[#E8A838]/10 border border-[#E8A838]/30 text-[#B07D1A] px-3 py-0.5 text-xs font-semibold">
+                      Original
+                    </span>
+                    {isBundle ? (
+                      <BundleCard
+                        key={key}
+                        rank={0}
+                        rankedProduct={similarAnchor}
+                        nutrientNames={nutrientNames}
+                        nutrientDescriptions={nutrientDescriptions}
+                        hasGoals={hasGoals}
+                        gender={gender}
+                        ageTag={ageTag}
+                        allSelectedPreferences={foodPreferences}
+                        allSelectedRestrictions={foodRestrictions}
+                        allSelectedReligious={religiousPreferences}
+                        hideFindSimilar
+                      />
+                    ) : (
+                      <ProductCard
+                        key={key}
+                        rank={0}
+                        rankedProduct={similarAnchor}
+                        nutrientNames={nutrientNames}
+                        nutrientDescriptions={nutrientDescriptions}
+                        hasGoals={hasGoals}
+                        gender={gender}
+                        ageTag={ageTag}
+                        allSelectedPreferences={foodPreferences}
+                        allSelectedRestrictions={foodRestrictions}
+                        allSelectedReligious={religiousPreferences}
+                        hideFindSimilar
+                      />
+                    )}
+                  </div>
                 );
-              })}
+              })()}
+
+              {inSimilarMode
+                ? similarCandidates.slice(0, displayCount).map((cand, idx) => {
+                    const rp = cand.ranked;
+                    const key = rp.products.map((p) => p.id).join("-");
+                    const isBundle = rp.products.length > 1;
+                    const cardProps = {
+                      rank: idx + 1,
+                      rankedProduct: rp,
+                      nutrientNames,
+                      nutrientDescriptions,
+                      hasGoals,
+                      gender,
+                      ageTag,
+                      allSelectedPreferences: foodPreferences,
+                      allSelectedRestrictions: foodRestrictions,
+                      allSelectedReligious: religiousPreferences,
+                      hideFindSimilar: true,
+                    };
+                    return (
+                      <div key={key} className="relative">
+                        <SimilarityPill explanation={cand.explanation} />
+                        {isBundle ? <BundleCard {...cardProps} /> : <ProductCard {...cardProps} />}
+                      </div>
+                    );
+                  })
+                : rankedProducts.slice(0, displayCount).map((rp, idx) => {
+                    const key = rp.products.map((p) => p.id).join("-");
+                    const isBundle = rp.products.length > 1;
+                    return isBundle ? (
+                      <BundleCard
+                        key={key}
+                        rank={idx + 1}
+                        rankedProduct={rp}
+                        nutrientNames={nutrientNames}
+                        nutrientDescriptions={nutrientDescriptions}
+                        hasGoals={hasGoals}
+                        gender={gender}
+                        ageTag={ageTag}
+                        allSelectedPreferences={foodPreferences}
+                        allSelectedRestrictions={foodRestrictions}
+                        allSelectedReligious={religiousPreferences}
+                      />
+                    ) : (
+                      <ProductCard
+                        key={key}
+                        rank={idx + 1}
+                        rankedProduct={rp}
+                        nutrientNames={nutrientNames}
+                        nutrientDescriptions={nutrientDescriptions}
+                        hasGoals={hasGoals}
+                        gender={gender}
+                        ageTag={ageTag}
+                        allSelectedPreferences={foodPreferences}
+                        allSelectedRestrictions={foodRestrictions}
+                        allSelectedReligious={religiousPreferences}
+                      />
+                    );
+                  })}
             </div>
+
+            {/* Empty similar-mode hint (under the pinned anchor) */}
+            {inSimilarMode && displayLength === 0 && (
+              <p className="mt-6 text-sm text-muted-foreground text-center">
+                No other products in the catalog are similar enough to this one.
+              </p>
+            )}
+
             <div className="flex items-center gap-4 mt-6">
               <p className="text-muted-foreground text-sm">
-                Showing top {Math.min(rankedProducts.length, displayCount)} matches.
+                {inSimilarMode
+                  ? (displayCount >= displayLength
+                      ? `Showing all ${displayLength} similar ${displayLength === 1 ? "product" : "products"}.`
+                      : `Showing ${displayCount} of ${displayLength} similar products.`)
+                  : `Showing top ${Math.min(displayLength, displayCount)} matches.`}
               </p>
-              {displayCount < Math.min(rankedProducts.length, PAGE_SIZE * MAX_PAGES) && (
+              {displayCount < Math.min(displayLength, MAX_DISPLAY) && (
                 <button
                   type="button"
-                  onClick={() => setDisplayCount((c) => Math.min(c + PAGE_SIZE, PAGE_SIZE * MAX_PAGES, rankedProducts.length))}
+                  onClick={() => setDisplayCount((c) => Math.min(c + pageSize, MAX_DISPLAY, displayLength))}
                   className="text-sm text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
                 >
                   More products
                 </button>
               )}
-              {displayCount > PAGE_SIZE && (
+              {displayCount > pageSize && (
                 <button
                   type="button"
-                  onClick={() => setDisplayCount(PAGE_SIZE)}
+                  onClick={() => setDisplayCount(pageSize)}
                   className="text-sm text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
                 >
                   Less

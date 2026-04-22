@@ -34,11 +34,11 @@ export function NutrientMatchPill({ label, matched, tooltip }: NutrientMatchPill
   return (
     <span className="relative group/pill inline-flex">
       {pill}
-      {/* Tooltip — appears above the pill on hover */}
+      {/* Tooltip — appears below the pill */}
       <span
         className="
           pointer-events-none
-          absolute bottom-full left-1/2 -translate-x-1/2 mb-2
+          absolute top-full left-1/2 -translate-x-1/2 mt-2
           z-50 w-56
           rounded-xl border border-border bg-popover shadow-lg
           px-4 py-2 text-sm text-popover-foreground leading-relaxed
@@ -48,8 +48,8 @@ export function NutrientMatchPill({ label, matched, tooltip }: NutrientMatchPill
         "
       >
         {tooltip}
-        {/* Arrow pointing down */}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
+        {/* Arrow pointing up */}
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-border" />
       </span>
     </span>
   );

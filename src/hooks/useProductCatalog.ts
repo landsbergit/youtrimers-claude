@@ -25,7 +25,7 @@ export function useProductCatalog() {
         const { data: productRows, error: productError } = await supabase
           .from("products")
           .select(
-            "id, product_name, brand, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd, servings_per_container"
+            "id, product_name, brand, image_url, product_url, normalized_dosage_form, normalized_tags, cost_usd, servings_per_container, flavor, expiration_date, packaging"
           )
           .eq("is_active", true)
           .range(from, from + PAGE_SIZE - 1);
@@ -87,6 +87,9 @@ export function useProductCatalog() {
             costUsd,
             servingsPerContainer: servings,
             ingredients: ingByProduct.get(p.id) ?? [],
+            flavor: p.flavor ?? null,
+            expirationDate: p.expiration_date ?? null,
+            packaging: p.packaging ?? null,
           });
         }
 

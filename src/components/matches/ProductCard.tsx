@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, ZoomIn } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { RankedProduct } from "@/types/engine";
 import { useCart } from "@/context/CartContext";
+import { useRecommendationContext } from "@/context/RecommendationContext";
 import { MatchScoreBar } from "./MatchScoreBar";
 import { NutrientMatchPill } from "./NutrientMatchPill";
 import { ExtraIngredientsPill } from "./ExtraIngredientsPill";
@@ -11,16 +12,23 @@ import { AddToCartButton } from "./AddToCartButton";
 interface ProductCardProps {
   rank: number;
   rankedProduct: RankedProduct;
-  /** Map from ontology node UUID → display_name for labelling nutrient pills */
   nutrientNames: Map<string, string>;
-  /** Map from ontology node UUID → tooltip text (joined rule descriptions) */
   nutrientDescriptions: Map<string, string>;
+  hasGoals?: boolean;
+  gender?: string | null;
+  ageTag?: string | null;
+  allSelectedPreferences?: string[];
+  allSelectedRestrictions?: string[];
+  allSelectedReligious?: string[];
+  /** Hide the "Find similar" button (e.g. when already in similar mode). */
+  hideFindSimilar?: boolean;
 }
 
-export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions }: ProductCardProps) {
+export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescriptions, hasGoals, gender, ageTag, allSelectedPreferences, allSelectedRestrictions, allSelectedReligious, hideFindSimilar }: ProductCardProps) {
   const { products, score, matchedNutrientNodeIds, missedNutrientNodeIds, extraIngredientNames, matchedPreferenceTags, matchedRestrictionFreeTags, matchedReligiousTags } = rankedProduct;
   const product = products[0];
   const { isInCart } = useCart();
+  const { setSimilarAnchor } = useRecommendationContext();
   const inCart = isInCart(product.id);
   const [popupOpen, setPopupOpen] = useState(false);
   const [titleExpanded, setTitleExpanded] = useState(false);
@@ -89,9 +97,11 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-bold text-muted-foreground w-5 flex-shrink-0">
-                #{rank}
-              </span>
+              {rank > 0 && (
+                <span className="text-xs font-bold text-muted-foreground w-5 flex-shrink-0">
+                  #{rank}
+                </span>
+              )}
               <TooltipProvider delayDuration={300}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -124,7 +134,20 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
           </div>
 
           <div className="mt-2">
-            <MatchScoreBar score={score} />
+            <MatchScoreBar
+              score={score}
+              matchedNutrients={matchedNutrientNodeIds.map((id) => nutrientNames.get(id) ?? id)}
+              missedNutrients={missedNutrientNodeIds.map((id) => nutrientNames.get(id) ?? id)}
+              preferenceTags={matchedPreferenceTags}
+              restrictionTags={matchedRestrictionFreeTags}
+              religiousTags={matchedReligiousTags}
+              hasGoals={hasGoals}
+              gender={gender}
+              ageTag={ageTag}
+              allSelectedPreferences={allSelectedPreferences}
+              allSelectedRestrictions={allSelectedRestrictions}
+              allSelectedReligious={allSelectedReligious}
+            />
           </div>
 
           <p className="text-xs text-muted-foreground mt-1">
@@ -166,7 +189,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
             {matchedRestrictionFreeTags.map((tag) => (
               <span
                 key={`free-${tag}`}
-                className="inline-flex items-center rounded-full bg-[#11192A]/5 border border-[#11192A]/20 px-2.5 py-0.5 text-xs font-medium text-[#11192A]/70"
+                className="inline-flex items-center rounded-full bg-[#E8A838]/10 border border-[#E8A838]/30 px-2.5 py-0.5 text-xs font-medium text-[#B07D1A]"
               >
                 {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
               </span>
@@ -174,7 +197,7 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
             {matchedReligiousTags.map((tag) => (
               <span
                 key={`rel-${tag}`}
-                className="inline-flex items-center rounded-full bg-primary/10 border border-primary/30 px-2.5 py-0.5 text-xs font-medium text-primary"
+                className="inline-flex items-center rounded-full bg-[#E8A838]/10 border border-[#E8A838]/30 px-2.5 py-0.5 text-xs font-medium text-[#B07D1A]"
               >
                 {tag.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
               </span>
@@ -184,7 +207,18 @@ export function ProductCard({ rank, rankedProduct, nutrientNames, nutrientDescri
       </div>
 
       {/* Cart control — pushed to bottom */}
-      <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+      <div className={`mt-3 pt-3 border-t border-border flex items-center gap-2 ${hideFindSimilar ? "justify-end" : "justify-between"}`}>
+        {!hideFindSimilar && (
+          <button
+            type="button"
+            onClick={() => setSimilarAnchor(rankedProduct)}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors"
+            aria-label="Find similar products"
+          >
+            <ZoomIn size={13} />
+            Find similar
+          </button>
+        )}
         <AddToCartButton product={product} />
       </div>
     </div>

@@ -503,10 +503,12 @@ export default function PreferencesSection() {
                 {religiousNodes.map((node) => (
                   <label key={node.id} className="flex items-center gap-2 cursor-pointer select-none group">
                     <input
-                      type="checkbox"
+                      type="radio"
+                      name="religious-certification"
                       checked={religiousSelected.some((p) => p.id === node.id)}
-                      onChange={() => toggleReligious({ id: node.id, nodeName: node.nodeName })}
-                      className="h-4 w-4 rounded border-border accent-primary cursor-pointer flex-shrink-0"
+                      onChange={() => {}}
+                      onClick={() => toggleReligious({ id: node.id, nodeName: node.nodeName })}
+                      className="h-4 w-4 accent-primary cursor-pointer flex-shrink-0"
                     />
                     <span className="text-sm text-foreground group-hover:text-foreground/80">
                       {node.displayName}

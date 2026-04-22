@@ -8,7 +8,9 @@
       "Bash(npx tsc:*)",
       "Bash(echo \"exit: $?\")",
       "Bash(python \"C:/Users/User/dataPrep_iHerb/pages_directory/check_tags.py\")",
-      "Bash(python -c ':*)"
+      "Bash(python -c ':*)",
+      "Read(//tmp/**)",
+      "Bash(curl -s \"https://hhbxnmsyxerwpxllghvy.supabase.co/rest/v1/products?select=id,flavor,expiration_date,packaging&limit=1\" -H \"apikey: $\\(cat /tmp/key.txt\\)\")"
     ]
   }
 }

@@ -1,6 +1,13 @@
 import type { RankedProduct } from "@/types/engine";
 
 /**
+ * Score tier threshold: products within this score difference are considered
+ * "similar enough" that diversity re-ranking can reorder them.
+ * A product at 85% will never be moved below a product at 79% (diff > 0.05).
+ */
+const TIER_THRESHOLD = 0.05;
+
+/**
  * Similarity between two ranked results.
  *
  * Weights (sum = 1.0):
@@ -32,54 +39,86 @@ function similarity(a: RankedProduct, b: RankedProduct): number {
 }
 
 /**
- * MMR (Maximal Marginal Relevance) re-ranking.
+ * Tiered MMR (Maximal Marginal Relevance) re-ranking.
  *
- * At each step, pick the candidate that maximises:
- *   λ × relevance  −  (1 − λ) × maxSimilarityToSelected
+ * Groups products into score tiers (within TIER_THRESHOLD of each other),
+ * then applies MMR diversity re-ranking WITHIN each tier. Products never
+ * move across tiers — a higher-scored product always appears before a
+ * lower-scored one if their score difference exceeds the threshold.
  *
- * λ = diversityWeight:
- *   1.0 = pure relevance order (no diversity)
- *   0.0 = pure diversity (greedy farthest-first)
- *   0.5 = balanced (default)
- *
- * @param items        Already-sorted candidates (best score first)
- * @param lambda       0–1; higher = closer to original ranking
- * @param topN         How many items to return (re-ranks the whole list by default)
+ * @param items   Already-sorted candidates (best score first)
+ * @param lambda  0–1; higher = closer to original ranking within each tier
+ * @param topN    How many items to return
  */
 export function diversifyResults(
   items: RankedProduct[],
   lambda: number,
   topN: number = items.length,
 ): RankedProduct[] {
-  // λ = 1 means identity — skip computation
   if (lambda >= 0.99 || items.length <= 1) return items.slice(0, topN);
 
-  const selected: RankedProduct[] = [];
-  const candidates = [...items];
+  // Group into score tiers
+  const tiers: RankedProduct[][] = [];
+  let currentTier: RankedProduct[] = [];
+  let tierTopScore = -Infinity;
 
-  while (selected.length < topN && candidates.length > 0) {
-    let bestIdx = 0;
-    let bestScore = -Infinity;
+  for (const item of items) {
+    if (currentTier.length === 0) {
+      tierTopScore = item.score;
+      currentTier.push(item);
+    } else if (tierTopScore - item.score <= TIER_THRESHOLD) {
+      currentTier.push(item);
+    } else {
+      tiers.push(currentTier);
+      currentTier = [item];
+      tierTopScore = item.score;
+    }
+  }
+  if (currentTier.length > 0) tiers.push(currentTier);
 
-    for (let i = 0; i < candidates.length; i++) {
-      const relevance = candidates[i].score;
+  // Apply MMR within each tier, accumulating selected items across tiers
+  // so inter-tier diversity is also considered
+  const allSelected: RankedProduct[] = [];
 
-      const maxSim =
-        selected.length === 0
-          ? 0
-          : Math.max(...selected.map((s) => similarity(s, candidates[i])));
+  for (const tier of tiers) {
+    if (allSelected.length >= topN) break;
 
-      const mmrScore = lambda * relevance - (1 - lambda) * maxSim;
-
-      if (mmrScore > bestScore) {
-        bestScore = mmrScore;
-        bestIdx = i;
-      }
+    if (tier.length <= 1) {
+      allSelected.push(...tier);
+      continue;
     }
 
-    selected.push(candidates[bestIdx]);
-    candidates.splice(bestIdx, 1);
+    // MMR within this tier
+    const candidates = [...tier];
+    const tierSelected: RankedProduct[] = [];
+
+    while (tierSelected.length < candidates.length && allSelected.length + tierSelected.length < topN) {
+      let bestIdx = 0;
+      let bestScore = -Infinity;
+
+      for (let i = 0; i < candidates.length; i++) {
+        if (tierSelected.includes(candidates[i])) continue;
+
+        const relevance = candidates[i].score;
+        const allPrev = [...allSelected, ...tierSelected];
+        const maxSim = allPrev.length === 0
+          ? 0
+          : Math.max(...allPrev.map((s) => similarity(s, candidates[i])));
+
+        const mmrScore = lambda * relevance - (1 - lambda) * maxSim;
+
+        if (mmrScore > bestScore) {
+          bestScore = mmrScore;
+          bestIdx = i;
+        }
+      }
+
+      tierSelected.push(candidates[bestIdx]);
+      candidates.splice(bestIdx, 1);
+    }
+
+    allSelected.push(...tierSelected);
   }
 
-  return selected;
+  return allSelected.slice(0, topN);
 }
